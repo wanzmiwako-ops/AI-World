@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { ViewTransition, type ReactNode } from "react";
+import { ViewTransition, type CSSProperties, type ReactNode } from "react";
 import { Icon } from "@/components/icon";
 
 /** Lebar konten halaman: penuh di HP, lega di PC. Pindah halaman memudar halus. */
 export function Page({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <ViewTransition enter="page" exit="page" default="none">
-      <div className={`mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 sm:px-5 lg:gap-5 lg:px-10 ${className}`}>{children}</div>
+      <div className={`mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 sm:px-5 lg:gap-5 lg:px-10 2xl:px-8 ${className}`}>{children}</div>
     </ViewTransition>
   );
 }
@@ -71,7 +71,7 @@ export function Avatar({
   return (
     <span
       className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border-[3px] border-sky font-display font-semibold ${
-        tone === "sand" ? "bg-sand" : "bg-[#A8E6F0]"
+        tone === "sand" ? "bg-sand" : "bg-aqua"
       } ${className}`}
       style={{ width: size, height: size, fontSize: size * 0.42 }}
     >
@@ -102,28 +102,45 @@ export function PageSkeleton() {
   );
 }
 
+/** Hiasan melayang di kartu berwarna: gelembung (Samudra) atau hiasan khas tema lain. */
 export function Bubbles({ className = "" }: { className?: string }) {
   const items = [
-    { left: "10%", size: 12, dur: 6, delay: 0 },
-    { left: "38%", size: 9, dur: 5, delay: 1.6 },
-    { left: "62%", size: 15, dur: 7, delay: 3 },
-    { left: "84%", size: 8, dur: 5.5, delay: 4.2 },
+    { left: "8%", size: 12, dur: 6, delay: 0 },
+    { left: "30%", size: 9, dur: 5, delay: 1.6 },
+    { left: "52%", size: 15, dur: 7, delay: 3 },
+    { left: "70%", size: 10, dur: 6.5, delay: 0.8 },
+    { left: "86%", size: 8, dur: 5.5, delay: 4.2 },
+    { left: "42%", size: 11, dur: 6, delay: 2.4 },
   ];
   return (
     <span aria-hidden="true" className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`}>
       {items.map((b, i) => (
         <span
           key={i}
-          className="absolute bottom-2 rounded-full border-2 border-white/70 opacity-0"
-          style={{
-            left: b.left,
-            width: b.size,
-            height: b.size,
-            animation: `bubble ${b.dur}s linear ${b.delay}s infinite`,
-          }}
+          className="deco"
+          style={
+            {
+              left: b.left,
+              width: b.size,
+              height: b.size,
+              "--s": `${b.size}px`,
+              animation: `bubble ${b.dur}s linear ${b.delay}s infinite`,
+            } as CSSProperties
+          }
         />
       ))}
     </span>
+  );
+}
+
+/** Gambar besar khas tema di pojok kartu hero. */
+export function ThemeArt({ className = "", size = 120 }: { className?: string; size?: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`theme-art pointer-events-none absolute leading-none select-none ${className}`}
+      style={{ fontSize: size, animation: "bob 4s ease-in-out infinite" }}
+    />
   );
 }
 

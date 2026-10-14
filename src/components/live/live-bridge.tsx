@@ -7,6 +7,8 @@ import { heartbeat } from "@/app/(app)/live-actions";
 import { channels, emitLive, pushToast, setLive, useLive, type Person } from "@/lib/live";
 import { haptic, play, primeAudio } from "@/lib/feel";
 import { createClient } from "@/lib/supabase/client";
+import { applyTheme, isThemeId, themeInfo } from "@/lib/themes";
+import { gameName } from "@/lib/games/catalog";
 import { Toaster } from "./toaster";
 import { NudgeOverlay } from "./nudge-overlay";
 
@@ -30,12 +32,16 @@ export function LiveBridge({
   partner,
   initialUnread,
   pinEnabled,
+  theme,
+  since,
 }: {
   coupleId: string;
   me: Person;
   partner: Person | null;
   initialUnread: number;
   pinEnabled: boolean;
+  theme: string;
+  since: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -44,8 +50,15 @@ export function LiveBridge({
   const photoBatch = useRef<{ count: number; timer: ReturnType<typeof setTimeout> | null }>({ count: 0, timer: null });
 
   useEffect(() => {
-    setLive({ ready: true, coupleId, me, partner, unread: initialUnread });
-  }, [coupleId, me, partner, initialUnread]);
+    setLive({ ready: true, coupleId, me, partner, unread: initialUnread, since });
+  }, [coupleId, me, partner, initialUnread, since]);
+
+  // Tema dunia dari database (berlaku untuk berdua)
+  useEffect(() => {
+    const t = isThemeId(theme) ? theme : "ocean";
+    setLive({ theme: t });
+    applyTheme(t);
+  }, [theme]);
 
   // Suara di HP baru boleh berbunyi setelah layar disentuh sekali
   useEffect(() => {
@@ -116,6 +129,10 @@ export function LiveBridge({
         })
         .on("broadcast", { event: "activity" }, ({ payload }: { payload: Record<string, unknown> }) => {
           emitLive("activity", payload);
+          if (payload.kind === "theme" && isThemeId(payload.theme)) {
+            setLive({ theme: payload.theme });
+            applyTheme(payload.theme);
+          }
           if (payload.by === me.id) return;
           switch (payload.kind) {
             case "meeting":
@@ -130,6 +147,11 @@ export function LiveBridge({
             case "mood":
               toastFromPartner(`${partnerName} lagi merasa ${MOOD[Number(payload.mood)] ?? "…"}`, "Lihat Love Meter", "/love-meter", "pink");
               break;
+            case "theme": {
+              const t = themeInfo(String(payload.theme));
+              toastFromPartner(`${partnerName} mengubah dunia kalian`, `Selamat datang di ${t.name} ${t.art}`, "/tema", "pink");
+              break;
+            }
             case "photo": {
               const b = photoBatch.current;
               b.count += 1;
@@ -142,6 +164,19 @@ export function LiveBridge({
             }
           }
         })
+        .on("broadcast", { event: "game" }, ({ payload }: { payload: Record<string, unknown> }) => {
+          emitLive("game", payload);
+          if (payload.by === me.id) return;
+          const href = `/main/${String(payload.id)}`;
+          const onIt = pathRef.current === href;
+          const name = gameName(String(payload.kind));
+          if (payload.op === "insert" && !onIt) {
+            toastFromPartner(`${partnerName} ngajak main ${name}!`, "Ketuk untuk ikut main", href, "pink");
+          } else if (payload.op === "update" && !onIt && payload.status === "playing" && payload.turn === me.id) {
+            toastFromPartner(`Giliranmu di ${name}`, `${partnerName} sudah jalan`, href, "aqua");
+          }
+        })
+        .on("broadcast", { event: "game_cursor" }, ({ payload }: { payload: Record<string, unknown> }) => emitLive("game_cursor", payload))
         .on("broadcast", { event: "nudge" }, ({ payload }: { payload: Record<string, unknown> }) => {
           emitLive("nudge", payload);
           if (payload.by !== me.id) setLive({ nudge: { kind: String(payload.kind), at: Date.now() } });

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useLive } from "@/lib/live";
 
-const PAGES: Record<string, string> = {
+export const PAGES: Record<string, string> = {
   "/": "Beranda",
   "/chat": "Chat",
   "/kalender": "Kalender",
@@ -13,7 +13,13 @@ const PAGES: Record<string, string> = {
   "/ruang-bicara": "Ruang Bicara",
   "/galeri": "Galeri",
   "/akun": "Akun",
+  "/main": "Main Bareng",
+  "/tema": "Tema",
 };
+
+export function pageName(page: string | null) {
+  return page ? (PAGES[page] ?? PAGES[`/${page.split("/")[1]}`] ?? null) : null;
+}
 
 function ago(iso: string | null) {
   if (!iso) return null;
@@ -38,14 +44,14 @@ export function PartnerStatus({ name, lastActive }: { name: string; lastActive: 
     return () => clearInterval(t);
   }, [lastActive]);
 
-  const pageName = page ? PAGES[page] ?? PAGES[`/${page.split("/")[1]}`] : null;
+  const where = pageName(page);
 
   return (
     <span className="flex items-center gap-1.5 text-[13px] font-semibold text-muted" aria-live="polite">
       <span className={`size-2 rounded-full ${online ? "bg-[#2FBF71]" : "bg-[#B7C6D3]"}`} style={online ? { animation: "beat 2s ease-in-out infinite" } : undefined} />
       {online ? (
         <span className="truncate">
-          {name} lagi online{pageName ? ` · buka ${pageName}` : ""}
+          {name} lagi online{where ? ` · buka ${where}` : ""}
         </span>
       ) : (
         <span className="truncate">

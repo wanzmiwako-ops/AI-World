@@ -10,6 +10,7 @@ export type Couple = {
   anniversary: string | null;
   invite_code: string;
   created_at: string;
+  theme?: string | null;
 };
 
 export type Meeting = {

@@ -25,7 +25,7 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
         className="relative flex max-h-[92svh] w-full max-w-md flex-col gap-5 overflow-y-auto rounded-t-[32px] bg-sky px-6 pt-3 pb-[max(env(safe-area-inset-bottom),24px)] lg:rounded-[32px] lg:pt-6"
         style={{ animation: "sheet-up .32s cubic-bezier(.2,.9,.3,1) both", overscrollBehavior: "contain" }}
       >
-        <span aria-hidden="true" className="mx-auto h-1.5 w-12 shrink-0 rounded-full bg-[#C4DCEC] lg:hidden" />
+        <span aria-hidden="true" className="mx-auto h-1.5 w-12 shrink-0 rounded-full bg-line lg:hidden" />
         <div className="flex items-center justify-between gap-3">
           <h2 className="font-display text-[22px] font-semibold">{title}</h2>
           <button type="button" onClick={onClose} aria-label="Tutup" className="flex size-10 items-center justify-center rounded-full bg-white">

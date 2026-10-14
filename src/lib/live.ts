@@ -31,6 +31,8 @@ type LiveState = {
   unread: number;
   toasts: Toast[];
   nudge: { kind: string; at: number } | null;
+  theme: string;
+  since: string | null;
 };
 
 let state: LiveState = {
@@ -43,6 +45,8 @@ let state: LiveState = {
   unread: 0,
   toasts: [],
   nudge: null,
+  theme: "ocean",
+  since: null,
 };
 
 const subscribers = new Set<() => void>();
