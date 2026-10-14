@@ -8,6 +8,8 @@ import { getViewer } from "@/lib/dal";
 import { JoinCodeForm } from "@/components/join-code-form";
 import { signOut } from "./actions";
 import { AvatarEditor, CopyCode, CoupleForm, PasswordForm, ProfileForm } from "./account-forms";
+import { SecuritySettings } from "./security-settings";
+import { NotificationSettings } from "@/components/notification-settings";
 
 export const metadata: Metadata = { title: "Akun" };
 
@@ -22,11 +24,23 @@ async function AccountContent({ searchParams }: { searchParams: PageProps<"/akun
         </div>
       )}
 
-      <section className="card flex animate-rise flex-col gap-6 p-6" aria-labelledby="profil">
-        <h2 id="profil" className="font-display text-xl font-medium">Profil</h2>
-        <AvatarEditor userId={viewer.userId} name={viewer.profile.display_name} url={viewer.profile.avatar_url} />
-        <ProfileForm name={viewer.profile.display_name} email={viewer.email} />
-      </section>
+      <div className="flex flex-col gap-5">
+        <section className="card flex animate-rise flex-col gap-6 p-6" aria-labelledby="profil">
+          <h2 id="profil" className="font-display text-xl font-medium">Profil</h2>
+          <AvatarEditor userId={viewer.userId} name={viewer.profile.display_name} url={viewer.profile.avatar_url} />
+          <ProfileForm name={viewer.profile.display_name} email={viewer.email} />
+        </section>
+
+        <section className="card flex animate-rise flex-col gap-4 p-6" aria-labelledby="keamanan">
+          <h2 id="keamanan" className="font-display text-xl font-medium">Keamanan</h2>
+          <SecuritySettings pinEnabled={viewer.pinEnabled} lockMinutes={viewer.lockMinutes} />
+        </section>
+
+        <section className="card flex animate-rise flex-col gap-3 p-6" aria-labelledby="notifikasi">
+          <h2 id="notifikasi" className="font-display text-xl font-medium">Notifikasi &amp; suara</h2>
+          <NotificationSettings />
+        </section>
+      </div>
 
       <div className="flex flex-col gap-5">
         <section className="card flex animate-rise flex-col gap-4 p-6" aria-labelledby="pasangan">

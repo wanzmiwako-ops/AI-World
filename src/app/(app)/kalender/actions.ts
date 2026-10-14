@@ -3,7 +3,9 @@
 import { refresh } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireCouple } from "@/lib/dal";
-import { jakartaLocalToIso } from "@/lib/dates";
+import { formatShort, formatTime, jakartaLocalToIso } from "@/lib/dates";
+import { after } from "next/server";
+import { notifyPartner } from "@/lib/push";
 import type { ActionState } from "@/lib/types";
 
 export async function createMeeting(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -11,9 +13,9 @@ export async function createMeeting(_prev: ActionState, formData: FormData): Pro
   const title = String(formData.get("title") ?? "").trim();
   const place = String(formData.get("place") ?? "").trim() || null;
   const note = String(formData.get("note") ?? "").trim() || null;
-  const when = String(formData.get("starts_at") ?? "");
+  const whenLocal = String(formData.get("starts_at") ?? "");
   if (!title) return { error: "Kasih nama rencananya, ya." };
-  if (!when) return { error: "Pilih tanggal dan jam." };
+  if (!whenLocal) return { error: "Pilih tanggal dan jam." };
 
   const supabase = await createClient();
   const { error } = await supabase.from("meetings").insert({
@@ -21,10 +23,19 @@ export async function createMeeting(_prev: ActionState, formData: FormData): Pro
     title,
     place,
     note,
-    starts_at: jakartaLocalToIso(when),
+    starts_at: jakartaLocalToIso(whenLocal),
     created_by: viewer.userId,
   });
   if (error) return { error: error.message };
+  const when = new Date(jakartaLocalToIso(whenLocal));
+  after(() =>
+    notifyPartner(supabase, {
+      title: `${viewer.profile.display_name} menambahkan jadwal`,
+      body: `${title} · ${formatShort(when)}, ${formatTime(when)}`,
+      url: "/kalender",
+      tag: "meeting",
+    }),
+  );
   refresh();
   return { ok: true, message: "Jadwal tersimpan!" };
 }

@@ -1,6 +1,8 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { after } from "next/server";
+import { messagePreview, notifyPartner } from "@/lib/push";
 import { requireCouple } from "@/lib/dal";
 import { signedUrls } from "@/lib/storage";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -36,6 +38,14 @@ export async function sendMessage(input: { kind: Message["kind"]; body?: string 
   if (error) return { error: error.message };
 
   const [message] = await withPhotoUrls(supabase, [data as ChatMessage]);
+  after(() =>
+    notifyPartner(supabase, {
+      title: viewer.profile.display_name,
+      body: messagePreview(input.kind, body),
+      url: "/chat",
+      tag: "chat",
+    }),
+  );
   return { ok: true, message };
 }
 

@@ -6,7 +6,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-dvh flex-col lg:flex-row">
+    <div className="flex min-h-svh flex-col lg:flex-row">
       <section className="relative flex shrink-0 flex-col overflow-hidden bg-ocean px-7 pt-[max(env(safe-area-inset-top),56px)] pb-20 text-white lg:w-1/2 lg:justify-between lg:px-16 lg:py-14">
         <span aria-hidden="true" className="absolute -top-16 -right-16 size-64 rounded-full bg-aqua/40" />
         <Bubbles />

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Heart } from "@/components/cat";
+import { TapHeart } from "@/components/celebrate";
 import { Page, PageHeader, PageSkeleton } from "@/components/ui";
 import { requireCouple } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
@@ -38,7 +39,9 @@ async function LoveContent() {
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
-            <Heart size={22} />
+            <TapHeart className="rounded-full">
+              <Heart size={26} />
+            </TapHeart>
             <span className="font-display text-[60px] leading-none font-semibold">{love.score}</span>
             <span className="text-[15px] font-bold text-ocean">{love.label}</span>
           </div>

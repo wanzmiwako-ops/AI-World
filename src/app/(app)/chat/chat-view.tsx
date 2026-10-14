@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
-import type { RealtimeChannel } from "@supabase/supabase-js";
 import { loadOlder, markRead, sendMessage, type ChatMessage } from "./actions";
 import { Cat, Heart } from "@/components/cat";
 import { Icon } from "@/components/icon";
 import { Avatar } from "@/components/ui";
-import { useCoupleChannel } from "@/lib/realtime";
+import { broadcast, useLive, useLiveEvent } from "@/lib/live";
+import { burstHearts, centerOf, haptic, play } from "@/lib/feel";
 import { createClient } from "@/lib/supabase/client";
 import { randomId, uploadPhoto } from "@/lib/image";
 
@@ -44,13 +44,12 @@ export function ChatView({
   const [messages, setMessages] = useState<ChatMessage[]>(initial);
   const [draft, setDraft] = useState("");
   const [typing, setTyping] = useState(false);
-  const [online, setOnline] = useState(false);
+  const online = useLive((s) => s.partnerOnline);
   const [hasMore, setHasMore] = useState(initial.length >= 60);
   const [error, setError] = useState<string>();
   const [, startTransition] = useTransition();
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const channelRef = useRef<RealtimeChannel | null>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSent = useRef(0);
   const stickToBottom = useRef(true);
@@ -78,32 +77,27 @@ export function ChatView({
     [upsert],
   );
 
-  useCoupleChannel(
-    `couple:${coupleId}:chat`,
-    {
-      message: (payload) => {
-        const m = payload as unknown as ChatMessage;
-        upsert(m);
-        void resolveUrl(m);
-        if (m.sender_id !== me.id) {
-          setTyping(false);
-          if (document.visibilityState === "visible") startTransition(() => markRead());
-        }
-      },
-      message_update: (payload) => upsert(payload as unknown as ChatMessage),
-      typing: (payload) => {
-        if (payload.user === me.id) return;
-        setTyping(true);
-        if (typingTimer.current) clearTimeout(typingTimer.current);
-        typingTimer.current = setTimeout(() => setTyping(false), 3500);
-      },
-    },
-    {
-      presenceKey: me.id,
-      onPresence: (keys) => setOnline(Boolean(partner && keys.includes(partner.id))),
-      onReady: (ch) => (channelRef.current = ch),
-    },
-  );
+  // Kejadian realtime dibagikan oleh LiveBridge (satu koneksi untuk seluruh aplikasi)
+  useLiveEvent("message", (payload) => {
+    const m = payload as unknown as ChatMessage;
+    upsert(m);
+    void resolveUrl(m);
+    if (m.sender_id !== me.id) {
+      setTyping(false);
+      if (document.visibilityState === "visible") {
+        play("pop");
+        haptic(15);
+        startTransition(() => markRead());
+      }
+    }
+  });
+  useLiveEvent("message_update", (payload) => upsert(payload as unknown as ChatMessage));
+  useLiveEvent("typing", (payload) => {
+    if (payload.user === me.id) return;
+    setTyping(true);
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => setTyping(false), 3500);
+  });
 
   // Tandai dibaca saat membuka chat & saat kembali ke tab
   useEffect(() => {
@@ -128,12 +122,14 @@ export function ChatView({
     const now = Date.now();
     if (now - lastTypingSent.current < 2000) return;
     lastTypingSent.current = now;
-    void channelRef.current?.send({ type: "broadcast", event: "typing", payload: { user: me.id } });
+    broadcast("chat", "typing", { user: me.id });
   }
 
   function send(kind: ChatMessage["kind"], body: string | null, mediaPath: string | null = null, localUrl?: string, thumbPath: string | null = null) {
     setError(undefined);
     stickToBottom.current = true;
+    play(kind === "heart" ? "pop" : "send");
+    haptic(12);
     const tempId = `temp-${randomId()}`;
     upsert({
       id: tempId,
@@ -191,7 +187,7 @@ export function ChatView({
   const lastMine = [...messages].reverse().find((m) => m.sender_id === me.id);
 
   return (
-    <div className="flex h-dvh flex-col lg:h-[calc(100dvh-48px)] lg:pt-6">
+    <div className="flex h-dvh flex-col overflow-hidden lg:h-[calc(100dvh-48px)] lg:pt-6">
       <header
         className="z-10 flex flex-col gap-3 rounded-b-[28px] bg-white px-4 pb-3.5 shadow-soft lg:mx-10 lg:rounded-[28px] lg:pt-4"
         style={{ paddingTop: "max(env(safe-area-inset-top), 14px)" }}
@@ -220,7 +216,7 @@ export function ChatView({
         )}
       </header>
 
-      <div ref={listRef} onScroll={onScroll} className="flex flex-1 flex-col gap-2.5 overflow-y-auto px-4 py-4 lg:px-10">
+      <div ref={listRef} onScroll={onScroll} className="flex flex-1 flex-col gap-2.5 overflow-x-clip overflow-y-auto overscroll-contain px-4 py-4 lg:px-10">
         {hasMore && (
           <button type="button" onClick={older} className="chip self-center text-[13px]">
             Muat pesan sebelumnya
@@ -288,7 +284,7 @@ export function ChatView({
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 14px)" }}
       >
         {error && <p role="alert" className="px-1 text-sm font-semibold text-[#9b1c3a]">{error}</p>}
-        <div className="flex gap-2 overflow-x-auto">
+        <div className="scroll-row flex gap-2">
           {QUICK.map((q) => (
             <button key={q} type="button" onClick={() => send("text", q)} className="chip min-h-9 bg-sky text-[13px] shadow-none">
               {q}
@@ -313,9 +309,13 @@ export function ChatView({
             }}
             placeholder="Tulis pesan…"
             autoComplete="off"
-            className="h-[46px] min-w-0 flex-1 rounded-full border-2 border-tint bg-sky px-4 text-[15px] focus:border-ocean focus:outline-none"
+            className="h-[46px] min-w-0 flex-1 rounded-full border-2 border-tint bg-sky px-4 text-base focus:border-ocean focus:outline-none"
           />
-          <button type="button" onClick={() => send("heart", null)} aria-label="Kirim hati" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-pink-soft">
+          <button type="button" onClick={(e) => {
+              const { x, y } = centerOf(e.currentTarget);
+              burstHearts(x, y, 12);
+              send("heart", null);
+            }} aria-label="Kirim hati" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-pink-soft">
             <Heart size={22} beat={false} />
           </button>
           <button type="submit" aria-label="Kirim" className="flex size-[46px] shrink-0 items-center justify-center rounded-full bg-ocean text-white shadow-ocean">

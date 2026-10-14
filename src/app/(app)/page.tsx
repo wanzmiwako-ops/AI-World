@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { CatPair, Heart } from "@/components/cat";
+import { Heart } from "@/components/cat";
 import { CountUp } from "@/components/count-up";
 import { Icon } from "@/components/icon";
-import { Avatar, Bubbles, Page, PageSkeleton } from "@/components/ui";
+import { AppBar, Avatar, Bubbles, Page, PageSkeleton } from "@/components/ui";
+import { PetCats } from "@/components/pet-cats";
+import { NudgeBar } from "@/components/nudge-bar";
+import { PartnerStatus } from "@/components/partner-status";
+import { Celebrate } from "@/components/celebrate";
 import { CopyCode } from "@/app/(app)/akun/account-forms";
 import { JoinCodeForm } from "@/components/join-code-form";
 import { requireCouple } from "@/lib/dal";
@@ -20,6 +24,7 @@ type DashboardData = {
   unread: number;
   photos: Pick<Photo, "id" | "storage_path" | "thumb_path" | "created_at">[];
   love: LoveStats | null;
+  nudges_today?: { mine: number; partner: number };
 };
 
 /** Foto terbaru dimuat terpisah, jadi sisa Beranda tidak menunggu foto. */
@@ -61,23 +66,38 @@ async function Dashboard() {
   const daysToNext = next ? daysBetween(now, next.starts_at) : null;
   const idea = ideaOfTheDay(dayKey(now));
   const partnerName = viewer.partner?.display_name ?? "pasanganmu";
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: "Asia/Jakarta" }).format(now));
+  const greeting = hour < 4 ? "Selamat malam" : hour < 11 ? "Selamat pagi" : hour < 15 ? "Selamat siang" : hour < 18 ? "Selamat sore" : "Selamat malam";
+  const anniv = viewer.couple.anniversary;
+  const isAnniversary = Boolean(anniv && anniv.slice(5) === dayKey(now).slice(5) && days > 0);
+  const milestone = days > 0 && days % 100 === 0;
+  const special = isAnniversary ? `Happy anniversary! ${Math.round(days / 365)} tahun bersama` : milestone ? `Hari ke-${days}! Hari spesial kalian` : null;
 
   return (
     <>
-      <header className="flex animate-rise items-center justify-between gap-3 pt-8 lg:pt-6">
-        <div className="flex flex-col gap-0.5">
-          <p className="text-sm text-muted first-letter:uppercase">{formatDay(now)}</p>
-          <h1 className="font-display text-[32px] leading-tight font-semibold lg:text-[38px]">
-            Hai, {viewer.profile.display_name}
+      <AppBar>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <p className="truncate text-[13px] text-muted first-letter:uppercase">{formatDay(now)}</p>
+          <h1 className="truncate font-display text-[26px] leading-tight font-semibold lg:text-[38px]">
+            {greeting}, {viewer.profile.display_name}
           </h1>
+          {viewer.partner && <PartnerStatus name={viewer.partner.display_name} lastActive={viewer.partner.last_active_at} />}
         </div>
-        <Link href="/akun" aria-label="Buka akun" className="flex">
+        <Link href="/akun" aria-label="Buka akun" className="tap flex shrink-0">
           <Avatar name={viewer.profile.display_name} url={viewer.profile.avatar_url} />
           {viewer.partner && (
             <Avatar name={viewer.partner.display_name} url={viewer.partner.avatar_url} tone="aqua" className="-ml-3" />
           )}
         </Link>
-      </header>
+      </AppBar>
+
+      {special && (
+        <div className="flex animate-rise items-center gap-3 rounded-[22px] bg-pink-soft px-4 py-3 text-[15px] font-bold text-[#9b1c3a]">
+          <Heart size={22} />
+          {special}
+          <Celebrate id={`${dayKey(now)}-${viewer.couple.id}`} />
+        </div>
+      )}
 
       {!viewer.partner && (
         <section className="card grid animate-rise gap-5 bg-sand-soft p-5 lg:grid-cols-2">
@@ -107,30 +127,30 @@ async function Dashboard() {
               </span>
               <span className="text-base font-medium">hari bersama</span>
             </div>
-            <CatPair size={72} />
+            <PetCats size={72} />
           </div>
           <Link
             href="/kalender"
-            className="relative self-start rounded-2xl bg-white/20 px-3.5 py-2 text-sm font-bold"
+            className="tap relative self-start rounded-2xl bg-white/20 px-3.5 py-2 text-sm font-bold"
           >
             {next
               ? `${daysToNext === 0 ? "Ketemu hari ini" : `Ketemu lagi ${formatShort(next.starts_at)} · ${daysToNext} hari lagi`}`
               : "Belum ada jadwal ketemu, yuk atur!"}
           </Link>
-          <Link href="/ketemu" className="btn relative bg-white text-ocean">
+          <Link href="/ketemu" className="btn tap relative bg-white text-ocean">
             <Icon name="pin" size={20} /> Check-in ketemu
           </Link>
         </section>
 
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-1">
-          <Link href="/love-meter" className="flex animate-rise flex-col gap-1 rounded-[26px] bg-aqua-soft p-5">
+          <Link href="/love-meter" className="tap flex animate-rise flex-col gap-1 rounded-[26px] bg-aqua-soft p-5">
             <span className="flex items-center justify-between text-sm font-bold">
               Love Meter <Heart size={22} />
             </span>
             <span className="font-display text-[44px] leading-none font-semibold">{love.score}</span>
             <span className="text-[13px] text-ink-soft">{love.label}</span>
           </Link>
-          <Link href="/ruang-bicara" className="flex animate-rise flex-col gap-1 rounded-[26px] bg-sand-soft p-5">
+          <Link href="/ruang-bicara" className="tap flex animate-rise flex-col gap-1 rounded-[26px] bg-sand-soft p-5">
             <span className="flex items-center justify-between text-sm font-bold">
               Ruang Bicara
               <span style={{ animation: "wiggle 2.6s ease-in-out infinite" }}>
@@ -143,8 +163,10 @@ async function Dashboard() {
         </div>
       </div>
 
+      {viewer.partner && <NudgeBar partnerName={partnerName} mine={d.nudges_today?.mine ?? 0} theirs={d.nudges_today?.partner ?? 0} />}
+
       <div className="grid gap-4 lg:grid-cols-3">
-        <Link href="/chat" className="card flex animate-rise items-center gap-4 p-5">
+        <Link href="/chat" className="card tap flex animate-rise items-center gap-4 p-5">
           <span className="relative flex size-12 items-center justify-center rounded-2xl bg-tint text-ocean">
             <Icon name="chat" />
             {(unread.count ?? 0) > 0 && (
@@ -161,7 +183,7 @@ async function Dashboard() {
           </span>
         </Link>
 
-        <Link href="/ide" className="card flex animate-rise items-center gap-4 p-5">
+        <Link href="/ide" className="card tap flex animate-rise items-center gap-4 p-5">
           <span className="flex size-12 items-center justify-center rounded-2xl bg-sand" style={{ animation: "wiggle 3s ease-in-out infinite" }}>
             <Icon name="sparkle" />
           </span>
@@ -173,7 +195,7 @@ async function Dashboard() {
           </span>
         </Link>
 
-        <Link href="/kalender" className="card flex animate-rise items-center gap-4 p-5">
+        <Link href="/kalender" className="card tap flex animate-rise items-center gap-4 p-5">
           <span className="flex size-12 items-center justify-center rounded-2xl bg-aqua-soft text-aqua-ink">
             <Icon name="calendar" />
           </span>
@@ -202,7 +224,7 @@ async function Dashboard() {
 export default function HomePage() {
   return (
     <Page>
-      <Suspense fallback={<div className="pt-10"><PageSkeleton /></div>}>
+      <Suspense fallback={<div className="pt-[max(calc(env(safe-area-inset-top)+16px),24px)]"><PageSkeleton /></div>}>
         <Dashboard />
       </Suspense>
     </Page>

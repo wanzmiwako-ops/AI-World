@@ -26,7 +26,7 @@
   --shadow-soft: 0 6px 20px rgba(11, 37, 69, 0.06);
   --shadow-ocean: 0 8px 18px rgba(10, 110, 189, 0.3);
 
-  --animate-rise: rise 0.5s ease both;
+  --animate-rise: rise 0.32s cubic-bezier(.2,.8,.2,1) both;
   --animate-bob: bob 2.6s ease-in-out infinite;
   --animate-hop: hop 1.1s ease-in-out infinite;
   --animate-beat: beat 1.6s ease-in-out infinite;
@@ -35,7 +35,7 @@
 }
 
 @keyframes rise {
-  from { opacity: 0; transform: translateY(14px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
 @keyframes bob {
@@ -101,6 +101,47 @@
 @keyframes fillring {
   from { stroke-dasharray: 0 600; }
 }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-10px); }
+  40% { transform: translateX(9px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(4px); }
+}
+@keyframes heart-fly {
+  0% { transform: translate(0, 0) scale(0.4) rotate(0deg); opacity: 0; }
+  15% { opacity: 1; transform: translate(calc(var(--dx) * 0.15), calc(var(--dy) * 0.15)) scale(1.15) rotate(calc(var(--rot) * 0.3)); }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0.8) rotate(var(--rot)); opacity: 0; }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-16px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.6); }
+  70% { opacity: 1; transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+@keyframes vt-out {
+  to { opacity: 0; }
+}
+@keyframes vt-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes wave-hand {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  10%, 30% { transform: rotate(14deg); }
+  20%, 40% { transform: rotate(-8deg); }
+}
 @keyframes sway {
   0%, 100% { transform: translateX(0); }
   50% { transform: translateX(-22px); }
@@ -115,11 +156,54 @@
   body {
     background: var(--color-sky);
     color: var(--color-navy);
+    /* Kokoh: tidak bisa tergeser ke kiri/kanan, tidak memantul di ujung layar */
+    overflow-x: clip;
+    overscroll-behavior: none;
+    max-width: 100%;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   body {
     font-family: var(--font-sans);
     -webkit-tap-highlight-color: transparent;
+    /* Tidak ada zoom karena ketuk dua kali */
+    touch-action: manipulation;
+  }
+
+  /* Input minimal 16px supaya iPhone tidak otomatis zoom saat mengetik */
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+
+  /* Elemen tampilan aplikasi tidak ikut terseleksi/ter-"tahan" seperti halaman web */
+  button,
+  nav,
+  a,
+  img,
+  svg {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  img {
+    -webkit-user-drag: none;
+  }
+
+  /* Baris yang bisa digeser horizontal: tanpa scrollbar & tidak menarik halaman */
+  .scroll-row {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .scroll-row::-webkit-scrollbar {
+    display: none;
   }
 
   a {
@@ -226,6 +310,14 @@
   }
 }
 
+/* Umpan balik saat ditekan: sedikit mengecil, seperti tombol aplikasi native */
+@utility tap {
+  transition: transform 0.14s ease, background-color 0.2s ease;
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
 @utility label {
   font-size: 14px;
   font-weight: 700;
@@ -238,4 +330,12 @@
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* Transisi halus antar halaman (View Transitions) */
+::view-transition-old(.page) {
+  animation: 110ms ease-out both vt-out;
+}
+::view-transition-new(.page) {
+  animation: 220ms cubic-bezier(.2,.8,.2,1) both vt-in;
 }

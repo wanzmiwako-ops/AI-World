@@ -1,16 +1,25 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { ViewTransition, type ReactNode } from "react";
 import { Icon } from "@/components/icon";
 
-/** Lebar konten halaman: penuh di HP, lega di PC. */
+/** Lebar konten halaman: penuh di HP, lega di PC. Pindah halaman memudar halus. */
 export function Page({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div
-      className={`mx-auto flex w-full max-w-5xl flex-col gap-5 px-5 lg:px-10 ${className}`}
-      style={{ paddingTop: "max(env(safe-area-inset-top), 20px)" }}
+    <ViewTransition enter="page" exit="page" default="none">
+      <div className={`mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 sm:px-5 lg:gap-5 lg:px-10 ${className}`}>{children}</div>
+    </ViewTransition>
+  );
+}
+
+/** Bilah judul yang menempel di atas saat halaman digulir (seperti aplikasi native). */
+export function AppBar({ children }: { children: ReactNode }) {
+  return (
+    <header
+      className="sticky top-0 z-30 -mx-4 flex items-center gap-3 bg-sky/90 px-4 pb-3 backdrop-blur-md sm:-mx-5 sm:px-5 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:pt-8 lg:backdrop-blur-none"
+      style={{ paddingTop: "max(calc(env(safe-area-inset-top) + 10px), 18px)" }}
     >
       {children}
-    </div>
+    </header>
   );
 }
 
@@ -26,22 +35,22 @@ export function PageHeader({
   right?: ReactNode;
 }) {
   return (
-    <header className="flex animate-rise items-center gap-3 pt-8 lg:pt-6">
+    <AppBar>
       {back && (
         <Link
           href={back}
           aria-label="Kembali"
-          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white text-navy lg:hidden"
+          className="tap flex size-11 shrink-0 items-center justify-center rounded-full bg-white text-navy shadow-soft lg:hidden"
         >
           <Icon name="back" size={20} />
         </Link>
       )}
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <h1 className="font-display text-[30px] leading-tight font-semibold lg:text-[36px]">{title}</h1>
-        {subtitle && <div className="text-[15px] text-muted">{subtitle}</div>}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <h1 className="truncate font-display text-[26px] leading-tight font-semibold lg:text-[36px]">{title}</h1>
+        {subtitle && <div className="truncate text-sm text-muted lg:text-[15px]">{subtitle}</div>}
       </div>
       {right}
-    </header>
+    </AppBar>
   );
 }
 

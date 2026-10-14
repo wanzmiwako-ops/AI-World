@@ -70,7 +70,7 @@ export function IdeasView() {
           { opts: SUASANA, value: suasana, set: setSuasana, all: "Semua suasana" },
           { opts: BUDGET, value: budget, set: setBudget, all: "Semua budget" },
         ].map((g, gi) => (
-          <div key={gi} className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 lg:mx-0 lg:px-0">
+          <div key={gi} className="scroll-row -mx-4 flex gap-2 px-4 pb-1 sm:-mx-5 sm:px-5 lg:mx-0 lg:px-0">
             {g.opts.map((o) => (
               <button
                 key={o}

@@ -5,6 +5,8 @@ import { refresh } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/dal";
 import { authErrorMessage } from "@/lib/site-url";
+import { readUnlockToken, setUnlockToken } from "@/lib/pin";
+import { notifySelf } from "@/lib/push";
 import type { ActionState } from "@/lib/types";
 
 export async function updateProfile(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -101,5 +103,79 @@ export async function updateCouple(_prev: ActionState, formData: FormData): Prom
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
+  await setUnlockToken(null);
   redirect("/login");
+}
+
+/* ---------------- Kunci PIN ---------------- */
+
+export async function savePin(pin: string, current: string | null, minutes: number | null) {
+  await getViewer();
+  if (!/^[0-9]{4}$/.test(pin)) return { error: "PIN harus 4 angka." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_pin", { p_pin: pin, p_current: current, p_lock_minutes: minutes });
+  if (error) return { error: error.message === "PIN lama salah" ? "PIN lama salah." : error.message };
+  await setUnlockToken(data as string);
+  refresh();
+  return { ok: true };
+}
+
+export async function removePin(current: string) {
+  await getViewer();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("remove_pin", { p_current: current });
+  if (error) return { error: "PIN salah." };
+  await setUnlockToken(null);
+  refresh();
+  return { ok: true };
+}
+
+export async function saveLockMinutes(minutes: number) {
+  await getViewer();
+  const supabase = await createClient();
+  await supabase.rpc("set_lock_minutes", { p_minutes: minutes });
+  refresh();
+  return { ok: true };
+}
+
+export async function lockNow() {
+  const supabase = await createClient();
+  const token = await readUnlockToken();
+  if (token) await supabase.rpc("lock_now", { p_unlock: token });
+  await setUnlockToken(null);
+  redirect("/kunci");
+}
+
+/* ---------------- Notifikasi push ---------------- */
+
+type SubJSON = { endpoint: string; keys?: { p256dh?: string; auth?: string } };
+
+export async function savePushSubscription(sub: SubJSON) {
+  const viewer = await getViewer();
+  if (!sub?.endpoint?.startsWith("https://") || !sub.keys?.p256dh || !sub.keys?.auth) return { error: "Langganan tidak valid." };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("push_subscriptions")
+    .upsert({ endpoint: sub.endpoint, user_id: viewer.userId, p256dh: sub.keys.p256dh, auth: sub.keys.auth }, { onConflict: "endpoint" });
+  if (error) return { error: error.message };
+  return { ok: true };
+}
+
+export async function deletePushSubscription(endpoint: string) {
+  await getViewer();
+  const supabase = await createClient();
+  await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
+  return { ok: true };
+}
+
+export async function sendTestPush() {
+  const viewer = await getViewer();
+  const supabase = await createClient();
+  return notifySelf(supabase, {
+    title: "A&I WORLD",
+    body: `Notifikasi sudah aktif, ${viewer.profile.display_name}! Mochi & Boba siap mengabari.`,
+    url: "/",
+    tag: "test",
+    force: true,
+  });
 }

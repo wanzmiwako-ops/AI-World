@@ -2,19 +2,31 @@
 
 import { refresh } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { after } from "next/server";
+import { notifyPartner } from "@/lib/push";
 import { requireCouple } from "@/lib/dal";
 import { durationText } from "@/lib/dates";
 import type { CheckinSession } from "@/lib/types";
 
 export async function startCheckin(coords: { lat: number; lng: number } | null, place: string | null) {
-  await requireCouple();
+  const viewer = await requireCouple();
   const supabase = await createClient();
-  const { error } = await supabase.rpc("checkin", {
+  const { data, error } = await supabase.rpc("checkin", {
     p_place: place,
     p_lat: coords?.lat ?? null,
     p_lng: coords?.lng ?? null,
   });
   if (error) return { error: error.message };
+  const session = data as CheckinSession;
+  after(() =>
+    notifyPartner(supabase, {
+      title: session.together_at ? "Kalian resmi ketemu! 🐾" : `${viewer.profile.display_name} sudah check-in`,
+      body: session.together_at ? "Selamat menikmati waktu berdua." : "Lagi bareng? Buka Mode Ketemu untuk check-in juga.",
+      url: "/ketemu",
+      tag: "checkin",
+      force: !session.together_at,
+    }),
+  );
   refresh();
   return { ok: true };
 }

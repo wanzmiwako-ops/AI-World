@@ -7,7 +7,8 @@ import { addCheckinPhoto, finishCheckin, saveCheckinNote, startCheckin, type Che
 import { Cat, CatPair } from "@/components/cat";
 import { Icon } from "@/components/icon";
 import { Avatar, Bubbles, FormMessage } from "@/components/ui";
-import { useCoupleChannel } from "@/lib/realtime";
+import { useLiveEvent } from "@/lib/live";
+import { burstHearts, haptic, play, rainHearts } from "@/lib/feel";
 import { createClient } from "@/lib/supabase/client";
 import { uploadPhoto } from "@/lib/image";
 
@@ -65,7 +66,7 @@ export function CheckinView({
   const fileInput = useRef<HTMLInputElement>(null);
   const partnerName = partner?.name ?? "pasanganmu";
 
-  useCoupleChannel(`couple:${coupleId}:events`, { checkin: () => router.refresh() });
+  useLiveEvent("checkin", () => router.refresh());
 
   const active = Boolean(session && iAmIn && session.together_at);
   useEffect(() => {
@@ -76,12 +77,28 @@ export function CheckinView({
 
   const phase = summary ? "done" : !session || !iAmIn ? "idle" : !session.together_at ? "waiting" : "active";
 
+  // Momen kalian resmi "ketemu": rayakan sekali
+  const prevPhase = useRef(phase);
+  useEffect(() => {
+    if (prevPhase.current === "waiting" && phase === "active") {
+      play("chime");
+      haptic([40, 60, 40, 60, 120]);
+      rainHearts(30);
+    }
+    prevPhase.current = phase;
+  }, [phase]);
+
   function doCheckin() {
     setError(undefined);
+    play("pop");
+    haptic(20);
     startTransition(async () => {
       const coords = await getPosition();
       const res = await startCheckin(coords, session?.place ?? plan?.place ?? null);
-      if (res.error) setError(res.error);
+      if (res.error) {
+        play("error");
+        setError(res.error);
+      }
     });
   }
 
@@ -91,7 +108,12 @@ export function CheckinView({
     startTransition(async () => {
       const res = await finishCheckin(session.id, mood, null);
       if (res.error) setError(res.error);
-      else if (res.summary) setSummary(res.summary);
+      else if (res.summary) {
+        setSummary(res.summary);
+        play("chime");
+        haptic([30, 50, 30]);
+        burstHearts(window.innerWidth / 2, window.innerHeight * 0.35, 18);
+      }
     });
   }
 

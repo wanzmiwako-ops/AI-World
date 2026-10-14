@@ -4,9 +4,16 @@ import { SUPABASE_KEY, SUPABASE_URL, isSupabaseConfigured } from "./env";
 
 const PUBLIC_PATHS = ["/login", "/daftar", "/lupa-password", "/auth"];
 
+/** Teruskan alamat halaman ke server (dipakai untuk kembali ke halaman semula setelah buka kunci PIN). */
+function withPath(request: NextRequest) {
+  const headers = new Headers(request.headers);
+  headers.set("x-pathname", request.nextUrl.pathname + request.nextUrl.search);
+  return headers;
+}
+
 /** Menyegarkan sesi Supabase dan mengarahkan tamu ke halaman login. */
 export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  let response = NextResponse.next({ request: { headers: withPath(request) } });
   if (!isSupabaseConfigured) return response;
 
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_KEY, {
@@ -15,16 +22,10 @@ export async function updateSession(request: NextRequest) {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet, headers) {
-        cookiesToSet.forEach(({ name, value }) =>
-          request.cookies.set(name, value),
-        );
-        response = NextResponse.next({ request });
-        cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options),
-        );
-        Object.entries(headers ?? {}).forEach(([key, value]) =>
-          response.headers.set(key, value),
-        );
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.next({ request: { headers: withPath(request) } });
+        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+        Object.entries(headers ?? {}).forEach(([key, value]) => response.headers.set(key, value));
       },
     },
   });
@@ -34,9 +35,7 @@ export async function updateSession(request: NextRequest) {
   const signedIn = Boolean(data?.claims?.sub);
 
   const { pathname } = request.nextUrl;
-  const isPublic = PUBLIC_PATHS.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`),
-  );
+  const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
   if (!signedIn && !isPublic) {
     const url = request.nextUrl.clone();

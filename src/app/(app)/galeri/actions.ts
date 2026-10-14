@@ -2,6 +2,8 @@
 
 import { refresh } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { after } from "next/server";
+import { notifyPartner } from "@/lib/push";
 import { requireCouple } from "@/lib/dal";
 
 export async function addPhotos(items: { path: string; thumbPath: string | null }[], caption: string | null) {
@@ -20,6 +22,14 @@ export async function addPhotos(items: { path: string; thumbPath: string | null 
     })),
   );
   if (error) return { error: error.message };
+  after(() =>
+    notifyPartner(supabase, {
+      title: `${viewer.profile.display_name} menambahkan ${valid.length} foto`,
+      body: "Kenangan baru di Galeri 📸",
+      url: "/galeri",
+      tag: "photo",
+    }),
+  );
   refresh();
   return { ok: true };
 }

@@ -23,7 +23,7 @@ async function Greeting() {
 
 export default function OnboardingPage() {
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-6 pt-[max(env(safe-area-inset-top),40px)] pb-12">
+    <div className="mx-auto flex min-h-svh w-full max-w-md flex-col gap-6 px-6 pt-[max(env(safe-area-inset-top),40px)] pb-12">
       <Logo size={40} textClass="text-[22px]" />
       <div className="flex justify-center py-2">
         <CatPair size={110} motion="hop" moods={["joy", "joy"]} />

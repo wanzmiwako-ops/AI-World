@@ -22,7 +22,10 @@ export const viewport: Viewport = {
   themeColor: "#0A6EBD",
   width: "device-width",
   initialScale: 1,
+  // Tampilan terkunci seperti aplikasi: tidak ter-zoom/tergeser tanpa sengaja
+  maximumScale: 1,
   viewportFit: "cover",
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
