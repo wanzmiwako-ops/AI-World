@@ -8,6 +8,8 @@ import { CountUp } from "@/components/count-up";
 import { Icon } from "@/components/icon";
 import { AppBar, Avatar, Bubbles, Page, PageSkeleton, ThemeArt } from "@/components/ui";
 import { PetCats } from "@/components/pet-cats";
+import { LoveHeart, loveTier } from "@/components/love-heart";
+import { SweetCard } from "@/components/sweet-card";
 import { NudgeBar } from "@/components/nudge-bar";
 import { PartnerStatus } from "@/components/partner-status";
 import { Celebrate } from "@/components/celebrate";
@@ -75,6 +77,10 @@ async function Dashboard() {
   const anniv = viewer.couple.anniversary;
   const isAnniversary = Boolean(anniv && anniv.slice(5) === dayKey(now).slice(5) && days > 0);
   const milestone = days > 0 && days % 100 === 0;
+  const greetEmoji = hour < 4 ? "🌙" : hour < 11 ? "🌤️" : hour < 15 ? "☀️" : hour < 18 ? "🌇" : "🌙";
+  const nextMilestone = Math.ceil((days + 1) / 100) * 100;
+  const milestonePct = Math.round(((days - (nextMilestone - 100)) / 100) * 100);
+  const tier = loveTier(love.score);
   const special = isAnniversary ? `Happy anniversary! ${Math.round(days / 365)} tahun bersama` : milestone ? `Hari ke-${days}! Hari spesial kalian` : null;
 
   return (
@@ -83,7 +89,10 @@ async function Dashboard() {
         <div className="flex min-w-0 flex-1 flex-col">
           <p className="truncate text-[13px] text-muted first-letter:uppercase">{formatDay(now)}</p>
           <h1 className="truncate font-display text-[26px] leading-tight font-semibold lg:text-[38px]">
-            {greeting}, {viewer.profile.display_name}
+            {greeting}, {viewer.profile.display_name}{" "}
+            <span aria-hidden="true" className="inline-block origin-[70%_70%]" style={{ animation: "wave-hand 2.8s ease-in-out infinite" }}>
+              {greetEmoji}
+            </span>
           </h1>
           {viewer.partner && <PartnerStatus name={viewer.partner.display_name} lastActive={viewer.partner.last_active_at} />}
         </div>
@@ -134,6 +143,22 @@ async function Dashboard() {
             </div>
             <PetCats size={72} />
           </div>
+          <div className="relative flex flex-col gap-1.5">
+            <div className="flex items-baseline justify-between text-xs font-bold">
+              <span>Menuju hari ke-{nextMilestone} 🎉</span>
+              <span className="opacity-90">{nextMilestone - days} hari lagi</span>
+            </div>
+            <div className="h-2.5 overflow-hidden rounded-full bg-white/25">
+              <div
+                className="relative h-full rounded-full bg-white"
+                style={{ width: `${Math.max(4, milestonePct)}%`, animation: "grow 1.4s cubic-bezier(.2,.8,.2,1) .3s both" }}
+              >
+                <span aria-hidden="true" className="absolute -top-[7px] -right-2 text-[15px] leading-none" style={{ animation: "beat 1.6s ease-in-out infinite" }}>
+                  💗
+                </span>
+              </div>
+            </div>
+          </div>
           <StatusCard
             me={{
               id: viewer.userId,
@@ -166,12 +191,17 @@ async function Dashboard() {
         </section>
 
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-1">
-          <Link href="/love-meter" className="tap flex animate-rise flex-col gap-1 rounded-[26px] bg-aqua-soft p-5">
-            <span className="flex items-center justify-between text-sm font-bold">
-              Love Meter <Heart size={22} />
+          <Link href="/love-meter" className="tap relative flex animate-rise flex-col gap-1 overflow-hidden rounded-[26px] bg-aqua-soft p-5">
+            <span className="text-sm font-bold">Love Meter</span>
+            <span className="flex items-center gap-2">
+              <span className="font-display text-[44px] leading-none font-semibold">{love.score}</span>
+              <span className="ml-auto -mr-1 shrink-0" style={{ animation: "beat 2.4s ease-in-out infinite" }}>
+                <LoveHeart score={love.score} size={54} interactive={false} showNumber={false} />
+              </span>
             </span>
-            <span className="font-display text-[44px] leading-none font-semibold">{love.score}</span>
-            <span className="text-[13px] text-ink-soft">{love.label}</span>
+            <span className="text-[13px] text-ink-soft">
+              {tier.emoji} {tier.label}
+            </span>
           </Link>
           <Link href="/ruang-bicara" className="tap flex animate-rise flex-col gap-1 rounded-[26px] bg-sand-soft p-5">
             <span className="flex items-center justify-between text-sm font-bold">
@@ -187,6 +217,8 @@ async function Dashboard() {
       </div>
 
       {viewer.partner && <NudgeBar partnerName={partnerName} mine={d.nudges_today?.mine ?? 0} theirs={d.nudges_today?.partner ?? 0} />}
+
+      {viewer.partner && <SweetCard partnerName={partnerName} seed={days} />}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Link href="/chat" className="card tap flex animate-rise items-center gap-4 p-5">
