@@ -477,10 +477,7 @@ body:has([data-fullscreen]) .side-rail {
   }
 }
 
-/* Transisi halus antar halaman (View Transitions) */
-::view-transition-old(.page) {
-  animation: 110ms ease-out both vt-out;
-}
-::view-transition-new(.page) {
-  animation: 220ms cubic-bezier(.2,.8,.2,1) both vt-in;
+/* Masuk halaman: memudar halus (hanya opacity, ringan untuk HP) */
+.page-in {
+  animation: fade-in 0.2s ease-out both;
 }

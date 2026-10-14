@@ -56,7 +56,7 @@ async function accessToken(acc: ServiceAccount) {
 }
 
 export type NativeTarget = { token: string; platform: string };
-export type NativeMessage = { title: string; body: string; url: string; tag?: string; badge?: number; channel?: "pesan" | "kabar" };
+export type NativeMessage = { title: string; body: string; url: string; tag?: string; badge?: number; channel?: "pesan_kucing" | "kabar" };
 
 /** Mengembalikan token yang sudah tidak berlaku (aplikasi dihapus) supaya dibersihkan. */
 export async function sendFcm(targets: NativeTarget[], msg: NativeMessage): Promise<string[]> {
@@ -79,7 +79,7 @@ export async function sendFcm(targets: NativeTarget[], msg: NativeMessage): Prom
               ttl: "86400s",
               notification: {
                 channel_id: channel,
-                sound: channel === "pesan" ? "meow" : "default",
+                sound: channel === "pesan_kucing" ? "meow" : "default",
                 tag: msg.tag,
                 icon: "ic_stat_notify",
                 color: "#0A6EBD",
@@ -87,7 +87,7 @@ export async function sendFcm(targets: NativeTarget[], msg: NativeMessage): Prom
                 default_vibrate_timings: true,
               },
             },
-            apns: { payload: { aps: { sound: channel === "pesan" ? "meow.caf" : "default", badge: msg.badge, "thread-id": msg.tag } } },
+            apns: { payload: { aps: { sound: channel === "pesan_kucing" ? "meow.caf" : "default", badge: msg.badge, "thread-id": msg.tag } } },
           },
         }),
       }).catch(() => null);

@@ -34,6 +34,24 @@ export function setHapticOn(on: boolean) {
 }
 
 let ctx: AudioContext | null = null;
+let meowBuffer: AudioBuffer | null = null;
+let meowLoading = false;
+let meowSource: AudioBufferSourceNode | null = null;
+
+/** Rekaman meong kucing asli (public/sounds/meow.mp3), dimuat sekali. */
+function loadMeow() {
+  if (!ctx || meowBuffer || meowLoading) return;
+  meowLoading = true;
+  fetch("/sounds/meow.mp3")
+    .then((r) => r.arrayBuffer())
+    .then((b) => ctx!.decodeAudioData(b))
+    .then((buf) => {
+      meowBuffer = buf;
+    })
+    .catch(() => {
+      meowLoading = false;
+    });
+}
 
 /** Browser HP baru mengizinkan suara setelah layar disentuh sekali. */
 export function primeAudio() {
@@ -41,6 +59,7 @@ export function primeAudio() {
   try {
     ctx ??= new AudioContext();
     if (ctx.state === "suspended") void ctx.resume();
+    loadMeow();
   } catch {}
 }
 
@@ -84,9 +103,23 @@ export function play(name: Sfx) {
       tone(1568, { at: 0.09, dur: 0.22, gain: 0.1 });
       break;
     case "meow":
-      // "miaw" kecil: nada naik lalu turun dengan getaran halus
-      tone(620, { dur: 0.14, to: 1080, gain: 0.12, type: "triangle" });
-      tone(1080, { at: 0.13, dur: 0.24, to: 520, gain: 0.11, type: "triangle" });
+      if (meowBuffer) {
+        // suara kucing asli; meong sebelumnya dihentikan supaya tidak menumpuk
+        try {
+          meowSource?.stop();
+        } catch {}
+        const src = ctx.createBufferSource();
+        const g = ctx.createGain();
+        g.gain.value = 0.7;
+        src.buffer = meowBuffer;
+        src.connect(g).connect(ctx.destination);
+        src.start();
+        meowSource = src;
+      } else {
+        // cadangan saat rekaman belum termuat: "miaw" sintetis kecil
+        tone(620, { dur: 0.14, to: 1080, gain: 0.12, type: "triangle" });
+        tone(1080, { at: 0.13, dur: 0.24, to: 520, gain: 0.11, type: "triangle" });
+      }
       break;
     case "chime":
       [784, 988, 1175, 1568].forEach((f, i) => tone(f, { at: i * 0.08, dur: 0.3, gain: 0.1 }));

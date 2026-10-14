@@ -30,7 +30,7 @@ type Targets = {
 
 /** Pesan & kangen pakai saluran bersuara meong; kabar lain pakai suara biasa. */
 function channelFor(tag?: string) {
-  return tag === "chat" || tag === "nudge" ? "pesan" : "kabar";
+  return tag === "chat" || tag === "nudge" || tag === "test" ? "pesan_kucing" : "kabar";
 }
 
 async function deliverNative(supabase: SupabaseClient, targets: NativeTarget[], payload: PushPayload, badge?: number) {
@@ -84,7 +84,7 @@ export async function notifySelf(supabase: SupabaseClient, payload: PushPayload)
   const tokens = (native ?? []) as NativeTarget[];
   if (!data?.length && !tokens.length) return { error: "Perangkat ini belum mengaktifkan notifikasi." };
   if (tokens.length && !isFcmConfigured) return { error: "Kunci Firebase (FIREBASE_SERVICE_ACCOUNT) belum diisi di Vercel." };
-  await Promise.all([deliver(supabase, data ?? [], payload), deliverNative(supabase, tokens, { ...payload, tag: "chat" })]);
+  await Promise.all([deliver(supabase, data ?? [], payload), deliverNative(supabase, tokens, payload)]);
   return { ok: true };
 }
 

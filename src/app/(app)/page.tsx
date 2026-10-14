@@ -1,3 +1,4 @@
+import { UnreadBadge, UnreadText } from "@/components/live/unread";
 import { LiveRefresh } from "@/components/live/live-refresh";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -172,16 +173,12 @@ async function Dashboard() {
         <Link href="/chat" className="card tap flex animate-rise items-center gap-4 p-5">
           <span className="relative flex size-12 items-center justify-center rounded-2xl bg-tint text-ocean">
             <Icon name="chat" />
-            {(unread.count ?? 0) > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-pink px-1 text-[11px] font-bold text-white">
-                {unread.count}
-              </span>
-            )}
+            <UnreadBadge initial={unread.count ?? 0} />
           </span>
           <span className="flex flex-col">
             <span className="font-bold">Chat dengan {partnerName}</span>
             <span className="text-[13px] text-muted">
-              {(unread.count ?? 0) > 0 ? `${unread.count} pesan belum dibaca` : "Kirim kabar manis hari ini"}
+              <UnreadText initial={unread.count ?? 0} />
             </span>
           </span>
         </Link>

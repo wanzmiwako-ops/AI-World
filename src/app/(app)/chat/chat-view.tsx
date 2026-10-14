@@ -11,6 +11,7 @@ import { burstHearts, centerOf, haptic, play } from "@/lib/feel";
 import { createClient } from "@/lib/supabase/client";
 import { randomId, uploadPhoto } from "@/lib/image";
 import { attempt, OFFLINE } from "@/lib/offline";
+import { MESSAGE_COLS } from "@/lib/chat";
 
 type Person = { id: string; name: string; avatar: string | null };
 
@@ -83,6 +84,7 @@ function MessageRow({
   onReply,
   onJump,
   onMenu,
+  onOpenPhoto,
 }: {
   m: ChatMessage;
   mine: boolean;
@@ -95,6 +97,7 @@ function MessageRow({
   onReply: (m: ChatMessage) => void;
   onJump: (id: string) => void;
   onMenu: (id: string | null) => void;
+  onOpenPhoto: (m: ChatMessage) => void;
 }) {
   const [dx, setDx] = useState(0);
   const start = useRef<{ x: number; y: number } | null>(null);
@@ -184,7 +187,7 @@ function MessageRow({
                 </span>
               )}
               {m.kind === "photo" && (
-                <a href={m.fullUrl ?? m.url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-[22px] bg-white p-1.5 shadow-soft">
+                <button type="button" onClick={() => onOpenPhoto(m)} aria-label="Buka foto" className="overflow-hidden rounded-[22px] bg-white p-1.5 shadow-soft">
                   {m.url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={m.url} alt="Foto dari chat" loading="lazy" decoding="async" className="max-h-64 w-56 rounded-[17px] object-cover" />
@@ -193,7 +196,7 @@ function MessageRow({
                       <Icon name="image" size={30} />
                     </span>
                   )}
-                </a>
+                </button>
               )}
             </div>
           )}
@@ -243,6 +246,54 @@ function MessageRow({
   );
 }
 
+/** Lihat foto chat di dalam aplikasi (tidak membuka alamat penyimpanan di browser). */
+function PhotoViewer({ message, onClose }: { message: ChatMessage; onClose: () => void }) {
+  const [full, setFull] = useState<string | null>(message.fullUrl ?? null);
+  useEffect(() => {
+    if (full || !message.media_path) return;
+    let alive = true;
+    createClient()
+      .storage.from("gallery")
+      .createSignedUrl(message.media_path, 3600)
+      .then(({ data }) => {
+        if (alive && data?.signedUrl) setFull(data.signedUrl);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [full, message.media_path]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const src = full ?? message.url;
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Foto"
+      className="fixed inset-0 z-[60] flex flex-col bg-navy p-4 text-white"
+      style={{ paddingTop: "max(env(safe-area-inset-top), 16px)", paddingBottom: "max(env(safe-area-inset-bottom), 16px)", animation: "fade-in .15s ease both" }}
+      onClick={onClose}
+    >
+      <div className="flex justify-end">
+        <button type="button" onClick={onClose} aria-label="Tutup" className="flex size-11 items-center justify-center rounded-full bg-white/15">
+          <Icon name="close" size={20} />
+        </button>
+      </div>
+      <div className="flex min-h-0 flex-1 items-center justify-center py-4">
+        {src ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={src} alt="Foto dari chat" className="max-h-full max-w-full rounded-2xl object-contain" onClick={(e) => e.stopPropagation()} />
+        ) : (
+          <span className="text-sm opacity-80">Memuat foto…</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function ChatView({
   coupleId,
   me,
@@ -272,6 +323,7 @@ export function ChatView({
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [flashId, setFlashId] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<ChatMessage | null>(null);
   const partnerName = partner?.name ?? "Pasangan";
   const nameOf = (uid: string) => (uid === me.id ? "Kamu" : partnerName);
 
@@ -348,6 +400,18 @@ export function ChatView({
     }
   });
   useLiveEvent("message_update", (payload) => upsert(payload as unknown as ChatMessage));
+  // Koneksi realtime tersambung lagi → ambil pesan yang terlewat selama terputus
+  useLiveEvent("resync", async () => {
+    const last = [...messages].reverse().find((m) => !m.id.startsWith("temp-"));
+    let q = createClient().from("messages").select(MESSAGE_COLS).order("created_at", { ascending: true }).limit(100);
+    if (last) q = q.gt("created_at", last.created_at);
+    const { data } = await q;
+    for (const m of (data ?? []) as ChatMessage[]) {
+      upsert(m);
+      void resolveUrl(m);
+    }
+    if (data?.length) startTransition(readSafely);
+  });
   useLiveEvent("typing", (payload) => {
     if (payload.user === me.id) return;
     setTyping(true);
@@ -517,6 +581,7 @@ export function ChatView({
                 onReply={startReply}
                 onJump={jumpTo}
                 onMenu={setMenuFor}
+                onOpenPhoto={setViewing}
               />
             </Fragment>
           );
@@ -592,6 +657,7 @@ export function ChatView({
           </button>
         </div>
       </form>
+      {viewing && <PhotoViewer message={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 }

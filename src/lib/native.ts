@@ -19,6 +19,8 @@ type Handlers = {
   saveToken: (token: string, platform: string) => Promise<unknown>;
   away: () => void;
   back: () => void;
+  /** Notifikasi yang datang saat aplikasi sedang terbuka (Android tidak menampilkannya). */
+  foreground: (n: { title: string; body: string; url: string; tag: string }) => void;
 };
 
 let started = false;
@@ -74,10 +76,12 @@ export async function startNative(h: Handlers) {
     if (!isActive) h.away();
   });
 
-  // Saluran notifikasi Android: pesan & kangen bersuara meong
+  // Saluran notifikasi Android: pesan & kangen bersuara meong kucing.
+  // (Suara saluran tidak bisa diubah setelah dibuat, jadi saluran lama dihapus & diganti "pesan_kucing".)
   try {
+    for (const old of ["pesan", "pesan_meow"]) await FirebaseMessaging.deleteChannel({ id: old }).catch(() => {});
     await FirebaseMessaging.createChannel({
-      id: "pesan",
+      id: "pesan_kucing",
       name: "Pesan & kangen",
       description: "Chat dan kirim rasa dari pasangan",
       importance: Importance.High,
@@ -99,6 +103,11 @@ export async function startNative(h: Handlers) {
   void FirebaseMessaging.addListener("notificationActionPerformed", (e) => {
     const data = (e.notification?.data ?? {}) as { url?: string };
     if (data.url?.startsWith("/")) h.navigate(data.url);
+  });
+  void FirebaseMessaging.addListener("notificationReceived", (e) => {
+    const n = e.notification;
+    const data = (n?.data ?? {}) as { url?: string; tag?: string };
+    h.foreground({ title: n?.title ?? "A&I WORLD", body: n?.body ?? "", url: data.url ?? "/", tag: data.tag ?? "" });
   });
   void FirebaseMessaging.addListener("tokenReceived", ({ token }) => {
     void h.saveToken(token, nativePlatform());
