@@ -59,3 +59,14 @@ export async function removeNativeToken(token: string) {
   const supabase = await createClient();
   await supabase.from("native_push_tokens").delete().eq("token", token);
 }
+
+/** Pasang status "Lagi mikirin apa?" (teks kosong = hapus status). */
+export async function setStatus(text: string, emoji: string | null) {
+  const clean = String(text ?? "").trim().slice(0, 80);
+  const em = emoji ? String(emoji).trim().slice(0, 16) : null;
+  await requireCouple();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_status", { p_text: clean, p_emoji: em });
+  if (error) return { error: "Status gagal disimpan. Coba lagi, ya." };
+  return { ok: true, status: data as { text: string | null; emoji: string | null; at: string | null } };
+}

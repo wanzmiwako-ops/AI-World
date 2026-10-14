@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "@/components/icon";
 
 /** Panel yang naik dari bawah layar (seperti aplikasi native). */
@@ -17,9 +18,10 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
     };
   }, [open, onClose]);
 
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center lg:items-center" role="dialog" aria-modal="true" aria-label={title}>
+  if (!open || typeof document === "undefined") return null;
+  // Dirender langsung di <body>: tidak ikut warna/transform kartu tempat tombolnya berada
+  return createPortal(
+    <div className="fixed inset-0 z-[80] flex items-end justify-center text-navy lg:items-center" role="dialog" aria-modal="true" aria-label={title}>
       <button type="button" aria-label="Tutup" onClick={onClose} className="absolute inset-0 bg-navy/45" style={{ animation: "fade-in .2s ease both" }} />
       <div
         className="relative flex max-h-[92svh] w-full max-w-md flex-col gap-5 overflow-y-auto rounded-t-[32px] bg-sky px-6 pt-3 pb-[max(env(safe-area-inset-bottom),24px)] lg:rounded-[32px] lg:pt-6"
@@ -34,6 +36,7 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

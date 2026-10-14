@@ -2,6 +2,9 @@ export type Profile = {
   id: string;
   display_name: string;
   avatar_url: string | null;
+  status_text?: string | null;
+  status_emoji?: string | null;
+  status_at?: string | null;
 };
 
 export type Couple = {

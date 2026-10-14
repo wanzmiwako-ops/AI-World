@@ -1,3 +1,4 @@
+import { StatusCard } from "@/components/status-card";
 import { UnreadBadge, UnreadText } from "@/components/live/unread";
 import { LiveRefresh } from "@/components/live/live-refresh";
 import Link from "next/link";
@@ -133,6 +134,24 @@ async function Dashboard() {
             </div>
             <PetCats size={72} />
           </div>
+          <StatusCard
+            me={{
+              id: viewer.userId,
+              name: viewer.profile.display_name,
+              avatar: viewer.profile.avatar_url,
+              status: { text: viewer.profile.status_text ?? null, emoji: viewer.profile.status_emoji ?? null, at: viewer.profile.status_at ?? null },
+            }}
+            partner={
+              viewer.partner
+                ? {
+                    id: viewer.partner.id,
+                    name: viewer.partner.display_name,
+                    avatar: viewer.partner.avatar_url,
+                    status: { text: viewer.partner.status_text ?? null, emoji: viewer.partner.status_emoji ?? null, at: viewer.partner.status_at ?? null },
+                  }
+                : null
+            }
+          />
           <Link
             href="/kalender"
             className="tap relative self-start rounded-2xl bg-white/20 px-3.5 py-2 text-sm font-bold"

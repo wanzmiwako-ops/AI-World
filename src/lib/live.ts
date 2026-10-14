@@ -33,6 +33,8 @@ type LiveState = {
   nudge: { kind: string; at: number } | null;
   theme: string;
   since: string | null;
+  /** Status terbaru yang diterima lewat realtime (per user), lebih baru dari data halaman */
+  statuses: Record<string, { text: string | null; emoji: string | null; at: string | null }>;
 };
 
 let state: LiveState = {
@@ -47,6 +49,7 @@ let state: LiveState = {
   nudge: null,
   theme: "ocean",
   since: null,
+  statuses: {},
 };
 
 const subscribers = new Set<() => void>();

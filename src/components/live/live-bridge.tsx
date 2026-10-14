@@ -213,6 +213,10 @@ export function LiveBridge({
         })
         .on("broadcast", { event: "activity" }, ({ payload }: { payload: Record<string, unknown> }) => {
           emitLive("activity", payload);
+          if (payload.kind === "status" && typeof payload.by === "string") {
+            const st = { text: (payload.text as string) ?? null, emoji: (payload.emoji as string) ?? null, at: (payload.at as string) ?? null };
+            setLive((s) => ({ statuses: { ...s.statuses, [payload.by as string]: st } }));
+          }
           if (payload.kind === "theme" && isThemeId(payload.theme)) {
             setLive({ theme: payload.theme });
             applyTheme(payload.theme);
@@ -224,6 +228,11 @@ export function LiveBridge({
               break;
             case "issue":
               toastFromPartner(`${pname()} ingin ngobrol`, String(payload.title ?? ""), "/ruang-bicara", "sand");
+              break;
+            case "status":
+              if (payload.text || payload.emoji) {
+                toastFromPartner(`${pname()} pasang status baru`, `${payload.emoji ? `${String(payload.emoji)} ` : ""}${String(payload.text ?? "")}`, "/", "pink");
+              }
               break;
             case "issue_resolved":
               toastFromPartner("Kalian sudah sepakat ✨", String(payload.agreement ?? payload.title ?? ""), "/ruang-bicara", "aqua");
