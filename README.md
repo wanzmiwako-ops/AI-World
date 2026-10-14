@@ -19,6 +19,10 @@ Maskotnya sepasang kucing: **Mochi** (biru) dan **Boba** (oren).
 | **Ide Kencan** | Filter suasana & budget, tombol "Kocok ide", langsung masukkan ke kalender. |
 | **Ruang Bicara** | Tulis masalah dengan tenang → pasangan menulis sisi ceritanya (cerita masing-masing baru terbuka setelah keduanya menulis) → tulis kesepakatan. |
 | **Galeri** | Upload banyak foto sekaligus (otomatis dikecilkan), album per hari ketemuan, "Setahun lalu hari ini", lihat & hapus foto. |
+| **Notifikasi** | Notifikasi push ke HP walau aplikasi ditutup (pesan, check-in, jadwal, Ruang Bicara, foto, kirim kangen), notifikasi di dalam aplikasi yang muncul dari atas, angka pesan belum dibaca di menu & ikon aplikasi. |
+| **Kunci PIN** | PIN 4 angka (disimpan sebagai hash bcrypt, dicek di server). Terkunci otomatis setelah 1/5/15 menit ditinggal. 5× salah → jeda. Lupa PIN → masuk pakai kata sandi akun. |
+| **Kirim rasa** | Kangen, Peluk, Cium, Semangat: satu ketukan, pasangan langsung dapat kejutan layar penuh + notifikasi. |
+| **Suasana** | Kucing bisa dicolek (melompat, mengeong, bicara), hati beterbangan, efek suara & getar, status "Ica lagi online · buka Galeri", sapaan sesuai waktu, perayaan hari ke-100/anniversary. |
 | **Akun** | Ganti foto profil, nama panggilan, tanggal jadian, ganti kata sandi (wajib kata sandi lama), bagikan kode undangan, keluar. |
 
 ## Teknologi (versi terbaru per Oktober 2026)
@@ -43,6 +47,7 @@ Semua data dijaga di database dengan RLS: hanya kalian berdua yang bisa membaca 
    1. `20261013000000_ai_world.sql`: semua tabel, keamanan (RLS), check-in, realtime, bucket foto
    2. `20261013170000_gabung_pakai_kode.sql`: supaya bisa gabung pakai kode walau sudah sama-sama membuat ruang
    3. `20261013210000_lebih_cepat.sql`: mempercepat aplikasi (query digabung, index, thumbnail foto)
+   4. `20261014090000_pin_notifikasi_kangen.sql`: kunci PIN, notifikasi push, "kirim kangen", aktivitas realtime
 
    > Sudah pernah menjalankan sebagian? Cukup jalankan file yang belum.
 3. Buka **Authentication → URL Configuration**:
@@ -85,6 +90,7 @@ git push -u origin main
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
    - `NEXT_PUBLIC_SITE_URL` = `https://NAMA-APP.vercel.app`
+   - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (untuk notifikasi, lihat bagian **Notifikasi** di bawah)
 3. Klik **Deploy**.
 4. Kembali ke Supabase → **Authentication → URL Configuration**, ganti **Site URL** ke URL Vercel.
 
@@ -126,6 +132,31 @@ src/
 supabase/migrations/          ← skema database lengkap
 scripts/                      ← pembuat ikon PWA
 ```
+
+## Notifikasi (sekali setup)
+
+1. Di laptop, di folder proyek, jalankan:
+   ```bash
+   npm run vapid
+   ```
+   Hasilnya dua kunci: **Public Key** dan **Private Key**.
+2. Isi ke `.env.local` **dan** ke Vercel → Project → Settings → Environment Variables:
+   - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` = Public Key
+   - `VAPID_PRIVATE_KEY` = Private Key (rahasia, jangan dibagikan)
+   - `VAPID_SUBJECT` = `mailto:emailkamu@gmail.com`
+3. Redeploy di Vercel (Deployments → ⋯ → Redeploy).
+4. Di HP masing-masing: buka aplikasi → **Akun → Notifikasi & suara → Notifikasi push** → izinkan.
+   - **iPhone:** wajib dibuka dari ikon di Home Screen (Safari → Share → Add to Home Screen), iOS 16.4 ke atas.
+   - **Android:** bisa langsung dari Chrome, lebih enak kalau di-install juga.
+5. Tekan **Kirim notifikasi uji** untuk mengecek.
+
+Kalau pasangan sedang membuka aplikasi, notifikasi push tidak dikirim (dia sudah melihat notifikasi di dalam aplikasi), jadi tidak dobel.
+
+## Kunci PIN
+
+Akun → **Keamanan → Pasang PIN**. Setelah aktif, aplikasi meminta PIN setiap kali dibuka lagi setelah ditinggal
+lebih lama dari batas (1, 5, atau 15 menit). PIN tidak disimpan di HP: yang disimpan di database hanya hash-nya, dan
+pengecekannya di server. Lupa PIN → di layar PIN ketuk **Lupa PIN?** lalu masukkan kata sandi akun.
 
 ## Kenapa cepat
 
