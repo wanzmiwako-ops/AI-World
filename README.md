@@ -12,7 +12,8 @@ Maskotnya sepasang kucing: **Mochi** (biru) dan **Boba** (oren).
 | **Login email** | Daftar & masuk pakai email + kata sandi, atau link masuk ke email (tanpa kata sandi). Lupa kata sandi lewat email. |
 | **Pairing pasangan** | Satu orang membuat kode undangan 6 karakter, pasangannya memasukkan kode itu (di halaman awal, Beranda, atau Akun). Kalau dua-duanya terlanjur membuat kode, salah satu tinggal memasukkan kode pasangannya: isi ruangnya otomatis digabung. Maksimal 2 orang per ruang. |
 | **Beranda / Dashboard** | Hari bersama (angka menghitung naik), hitung mundur ke pertemuan berikutnya, Love Meter, topik Ruang Bicara, pesan belum dibaca, ide hari ini, foto terbaru. |
-| **Chat realtime** | Pesan teks, foto, hati, stiker kucing, balasan cepat, status *sedang mengetik*, *online*, dan *dibaca*. |
+| **Chat realtime** | Pesan teks, foto, hati, stiker kucing, balasan cepat, status *sedang mengetik*, *online*, dan *dibaca*. **Balas pesan tertentu**: geser bubble ke kanan (HP), tekan lama → Balas, atau tombol Balas saat kursor di atas pesan (PC). Ketuk kutipan untuk lompat ke pesan aslinya. |
+| **Aplikasi Android** | APK asli (Capacitor) dengan notifikasi Firebase yang andal, bunyi *meong* untuk pesan & kangen, ikon & layar pembuka kucing, tombol kembali Android. Isinya tetap versi web di Vercel, jadi update web langsung terasa tanpa install ulang. |
 | **Kalender pertemuan** | Jadwal ketemu per bulan, tambah/hapus jadwal. Pertemuan yang sudah lewat menampilkan lama ketemu dari Mode Ketemu. |
 | **Mode Ketemu (check-in)** | Check-in berdua saat bertemu, sah hanya kalau lokasi GPS kalian berdekatan (maks. 500 m). Timer berjalan, foto berdua langsung masuk galeri, pilih mood, ringkasan di akhir. Halaman berubah otomatis begitu pasangan check-in. |
 | **Love Meter** | Skor 0–100 dari data nyata: seberapa sering ketemu, jumlah chat, mood harian berdua, dan masalah yang selesai. Kucingnya ikut berekspresi sesuai mood. |
@@ -52,6 +53,7 @@ Semua data dijaga di database dengan RLS: hanya kalian berdua yang bisa membaca 
    3. `20261013210000_lebih_cepat.sql`: mempercepat aplikasi (query digabung, index, thumbnail foto)
    4. `20261014090000_pin_notifikasi_kangen.sql`: kunci PIN, notifikasi push, "kirim kangen", aktivitas realtime
    5. `20261014150000_tema_game.sql`: tema dunia & game bareng
+   6. `20261014200000_balas_aplikasi.sql`: balas bubble chat & notifikasi aplikasi Android
 
    > Sudah pernah menjalankan sebagian? Cukup jalankan file yang belum.
 3. Buka **Authentication → URL Configuration**:
@@ -138,7 +140,10 @@ src/
     themes.ts                 ← daftar tema (warnanya di globals.css)
     games/                    ← aturan game: TTS (pembuat papan), UNO, XO, kartu
 supabase/migrations/          ← skema database lengkap
-scripts/                      ← pembuat ikon PWA
+scripts/                      ← pembuat ikon PWA & aset Android, sinkron Capacitor
+android/                      ← proyek aplikasi Android (Capacitor)
+native-shell/                 ← halaman "tidak ada internet" di aplikasi
+.github/workflows/android.yml ← build APK otomatis
 ```
 
 ## Notifikasi (sekali setup)
@@ -159,6 +164,54 @@ scripts/                      ← pembuat ikon PWA
 5. Tekan **Kirim notifikasi uji** untuk mengecek.
 
 Kalau pasangan sedang membuka aplikasi, notifikasi push tidak dikirim (dia sudah melihat notifikasi di dalam aplikasi), jadi tidak dobel.
+
+## Aplikasi Android (APK)
+
+APK dibuat otomatis oleh **GitHub Actions** di cloud. Tidak perlu install Android Studio atau Node.js di laptop.
+
+### A. Firebase (sekali saja, untuk notifikasi)
+
+1. Buka [console.firebase.google.com](https://console.firebase.google.com) → **Create a project** → nama bebas (misal `A&I WORLD`), Google Analytics boleh dimatikan.
+2. Di halaman project: ikon **Android** (Add app) → **Android package name**: `com.aiworld.app` → **Register app** →
+   **Download google-services.json**. Langkah SDK berikutnya lewati saja (Next → Continue to console).
+3. ⚙️ **Project settings → Service accounts → Generate new private key** → file JSON terunduh. File ini **rahasia**.
+
+### B. Vercel
+
+**Settings → Environment Variables**, tambahkan:
+- `FIREBASE_SERVICE_ACCOUNT` = buka file JSON dari langkah A.3 dengan Notepad, salin **seluruh isinya**, tempel di sini.
+- (opsional) `NEXT_PUBLIC_ANDROID_APK_URL` = `https://github.com/USERNAME/ai-world/releases/latest/download/A-I-WORLD.apk`
+  (memunculkan tombol "Pasang aplikasi Android" di Akun; hanya bisa diunduh tanpa login kalau repo publik).
+
+Lalu **Redeploy**.
+
+### C. GitHub (repo → Settings → Secrets and variables → Actions)
+
+- Tab **Variables** → New repository variable:
+  - `CAP_SERVER_URL` = alamat Vercel, misal `https://nama-app.vercel.app`
+- Tab **Secrets** → New repository secret:
+  - `GOOGLE_SERVICES_JSON` = isi file `google-services.json` (buka dengan Notepad, salin semua)
+  - `ANDROID_KEYSTORE_BASE64` dan `ANDROID_KEYSTORE_PASSWORD` = dari file `android-secrets.txt` yang dikirim terpisah
+
+> **Simpan kunci tanda tangan (keystore) baik-baik dan jangan dibagikan.** APK versi baru hanya bisa dipasang menimpa
+> versi lama kalau ditandatangani dengan kunci yang sama.
+
+### D. Build & pasang
+
+1. GitHub → tab **Actions** → **Build APK Android** → **Run workflow** (±5–8 menit).
+   Setelah itu, build juga berjalan otomatis setiap ada perubahan di folder `android/`.
+2. Tab **Releases** (halaman depan repo, kolom kanan) → unduh **A-I-WORLD.apk**.
+3. Kirim file APK ke HP (atau ke pasangan lewat WhatsApp/Drive) → buka → izinkan **Instal aplikasi tidak dikenal**.
+4. Buka A&I WORLD → login → izinkan notifikasi. Selesai!
+5. Uji: **Akun → Notifikasi & suara → Kirim notifikasi uji**. Harus bunyi *meong* 🐱
+
+Tips HP **Xiaomi / Oppo / Vivo / Realme**: buka Pengaturan → Aplikasi → A&I WORLD → aktifkan **Mulai otomatis (Autostart)** dan
+setel **Baterai → Tanpa batasan**, supaya notifikasi tidak ditahan sistem.
+
+Catatan:
+- Perubahan tampilan/fitur web langsung muncul di aplikasi (aplikasi membuka versi Vercel). APK baru hanya perlu dipasang ulang
+  kalau ada perubahan di folder `android/`.
+- Di dalam aplikasi, masuk pakai **email + kata sandi**. Link masuk lewat email akan terbuka di browser, bukan di aplikasi.
 
 ## Kunci PIN
 

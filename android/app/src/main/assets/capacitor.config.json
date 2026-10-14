@@ -1,0 +1,36 @@
+{
+	"appId": "com.aiworld.app",
+	"appName": "A&I WORLD",
+	"webDir": "native-shell",
+	"server": {
+		"url": "https://ai-world.vercel.app",
+		"cleartext": false,
+		"androidScheme": "https",
+		"errorPath": "offline.html"
+	},
+	"android": {
+		"backgroundColor": "#F2F8FC",
+		"allowMixedContent": false
+	},
+	"plugins": {
+		"SplashScreen": {
+			"launchShowDuration": 1500,
+			"launchAutoHide": true,
+			"backgroundColor": "#0A6EBD",
+			"showSpinner": false,
+			"androidScaleType": "CENTER_INSIDE"
+		},
+		"StatusBar": {
+			"overlaysWebView": false,
+			"style": "LIGHT",
+			"backgroundColor": "#F2F8FC"
+		},
+		"FirebaseMessaging": {
+			"presentationOptions": [
+				"badge",
+				"sound",
+				"alert"
+			]
+		}
+	}
+}
