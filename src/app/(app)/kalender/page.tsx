@@ -10,7 +10,7 @@ import { CalendarView, type CalendarMeeting } from "./calendar-view";
 export const metadata: Metadata = { title: "Kalender" };
 
 async function CalendarContent({ searchParams }: { searchParams: PageProps<"/kalender">["searchParams"] }) {
-  const [viewer, params] = await Promise.all([requireCouple(), searchParams]);
+  const params = await searchParams;
   const today = dayKey();
   const raw = typeof params.m === "string" && /^\d{4}-\d{2}$/.test(params.m) ? params.m : today.slice(0, 7);
   const [y, m] = raw.split("-").map(Number);
@@ -20,18 +20,19 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/kal
   const end = new Date(Date.UTC(y, m, 1) - 7 * 3_600_000).toISOString();
 
   const supabase = await createClient();
-  const [meetingsRes, sessionsRes] = await Promise.all([
+  // Semua diambil bersamaan; RLS di database memastikan hanya data ruang kalian.
+  const [, meetingsRes, sessionsRes] = await Promise.all([
+    requireCouple(),
     supabase
       .from("meetings")
       .select("id, title, place, note, starts_at")
-      .eq("couple_id", viewer.couple.id)
       .gte("starts_at", start)
       .lt("starts_at", end)
       .order("starts_at"),
     supabase
       .from("checkin_sessions")
       .select("meeting_id, together_at, ended_at")
-      .eq("couple_id", viewer.couple.id)
+      .gte("created_at", start)
       .not("meeting_id", "is", null)
       .not("together_at", "is", null),
   ]);

@@ -9,7 +9,7 @@ import { Icon } from "@/components/icon";
 import { Avatar, Bubbles, FormMessage } from "@/components/ui";
 import { useCoupleChannel } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
-import { randomId, resizeImage } from "@/lib/image";
+import { uploadPhoto } from "@/lib/image";
 
 type Person = { id: string; name: string; avatar: string | null };
 
@@ -100,11 +100,9 @@ export function CheckinView({
     e.target.value = "";
     if (!file || !session) return;
     startTransition(async () => {
-      const blob = await resizeImage(file);
-      const path = `${coupleId}/ketemu/${session.id}/${randomId()}.webp`;
-      const { error: upErr } = await createClient().storage.from("gallery").upload(path, blob, { contentType: "image/webp" });
-      if (upErr) return setError(`Gagal mengunggah: ${upErr.message}`);
-      const res = await addCheckinPhoto(path, session.id);
+      const up = await uploadPhoto(createClient(), file, `${coupleId}/ketemu/${session.id}`);
+      if ("error" in up) return setError(`Gagal mengunggah: ${up.error}`);
+      const res = await addCheckinPhoto(up.path, up.thumbPath, session.id);
       if (res.error) setError(res.error);
       else setPhotos((n) => n + 1);
     });

@@ -4,16 +4,18 @@ import { refresh } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireCouple } from "@/lib/dal";
 
-export async function addPhotos(paths: string[], caption: string | null) {
+export async function addPhotos(items: { path: string; thumbPath: string | null }[], caption: string | null) {
   const viewer = await requireCouple();
-  const valid = paths.filter((p) => p.startsWith(`${viewer.couple.id}/`));
+  const prefix = `${viewer.couple.id}/`;
+  const valid = items.filter((i) => i.path.startsWith(prefix) && (!i.thumbPath || i.thumbPath.startsWith(prefix)));
   if (!valid.length) return { error: "Tidak ada foto yang valid." };
   const supabase = await createClient();
   const { error } = await supabase.from("photos").insert(
-    valid.map((storage_path) => ({
+    valid.map((i) => ({
       couple_id: viewer.couple.id,
       uploaded_by: viewer.userId,
-      storage_path,
+      storage_path: i.path,
+      thumb_path: i.thumbPath,
       caption: caption?.trim() || null,
     })),
   );
@@ -25,9 +27,9 @@ export async function addPhotos(paths: string[], caption: string | null) {
 export async function deletePhoto(id: string) {
   const viewer = await requireCouple();
   const supabase = await createClient();
-  const { data } = await supabase.from("photos").select("storage_path").eq("id", id).eq("couple_id", viewer.couple.id).maybeSingle();
+  const { data } = await supabase.from("photos").select("storage_path, thumb_path").eq("id", id).eq("couple_id", viewer.couple.id).maybeSingle();
   if (!data) return { error: "Foto tidak ditemukan." };
-  await supabase.storage.from("gallery").remove([data.storage_path]);
+  await supabase.storage.from("gallery").remove([data.storage_path, data.thumb_path].filter(Boolean) as string[]);
   await supabase.from("photos").delete().eq("id", id);
   refresh();
   return { ok: true };

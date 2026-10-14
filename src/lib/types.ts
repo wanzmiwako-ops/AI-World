@@ -57,6 +57,7 @@ export type IssueResponse = {
 export type Photo = {
   id: string;
   storage_path: string;
+  thumb_path: string | null;
   caption: string | null;
   uploaded_by: string;
   created_at: string;
@@ -70,6 +71,7 @@ export type Message = {
   kind: "text" | "heart" | "photo" | "sticker";
   body: string | null;
   media_path: string | null;
+  thumb_path?: string | null;
   created_at: string;
   read_at: string | null;
 };

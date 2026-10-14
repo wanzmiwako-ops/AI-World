@@ -11,16 +11,16 @@ import { ChatView } from "./chat-view";
 export const metadata: Metadata = { title: "Chat" };
 
 async function ChatContent() {
-  const viewer = await requireCouple();
   const supabase = await createClient();
   const now = new Date();
 
-  const [msgRes, nextRes] = await Promise.all([
-    supabase.from("messages").select("*").eq("couple_id", viewer.couple.id).order("created_at", { ascending: false }).limit(60),
+  // Pesan, jadwal, dan data akun diambil bersamaan (RLS menjaga datanya).
+  const [viewer, msgRes, nextRes] = await Promise.all([
+    requireCouple(),
+    supabase.from("messages").select("*").order("created_at", { ascending: false }).limit(60),
     supabase
       .from("meetings")
       .select("title, starts_at")
-      .eq("couple_id", viewer.couple.id)
       .gte("starts_at", now.toISOString())
       .order("starts_at")
       .limit(1)
@@ -28,8 +28,10 @@ async function ChatContent() {
   ]);
 
   const list = ((msgRes.data ?? []) as ChatMessage[]).reverse();
-  const urls = await signedUrls(supabase, list.map((m) => m.media_path ?? ""));
-  const initial = list.map((m) => ({ ...m, url: m.media_path ? urls[m.media_path] : undefined }));
+  const urls = await signedUrls(supabase, list.flatMap((m) => [m.thumb_path, m.media_path]));
+  const initial = list.map((m) =>
+    m.media_path ? { ...m, url: urls[m.thumb_path ?? m.media_path] ?? urls[m.media_path], fullUrl: urls[m.media_path] } : m,
+  );
 
   let nextMeeting: string | null = null;
   if (nextRes.data) {

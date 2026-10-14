@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { refresh } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionState } from "@/lib/types";
 
@@ -18,5 +19,6 @@ export async function joinCouple(_prev: ActionState, formData: FormData): Promis
   const supabase = await createClient();
   const { error } = await supabase.rpc("join_couple", { p_code: code });
   if (error) return { error: error.message };
+  refresh();
   redirect("/");
 }

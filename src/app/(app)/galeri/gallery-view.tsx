@@ -6,9 +6,9 @@ import { Cat } from "@/components/cat";
 import { Icon } from "@/components/icon";
 import { FormMessage } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
-import { randomId, resizeImage } from "@/lib/image";
+import { uploadPhoto } from "@/lib/image";
 
-export type GalleryPhoto = { id: string; url: string; caption: string | null; uploader: string };
+export type GalleryPhoto = { id: string; url: string; fullPath: string; caption: string | null; uploader: string };
 export type Album = { key: string; title: string; meta: string; badge: string | null; photos: GalleryPhoto[] };
 
 export function UploadButton({ coupleId }: { coupleId: string }) {
@@ -24,20 +24,24 @@ export function UploadButton({ coupleId }: { coupleId: string }) {
     setError(undefined);
     start(async () => {
       const supabase = createClient();
-      const paths: string[] = [];
-      for (const [i, file] of files.entries()) {
-        setProgress(`Mengunggah ${i + 1}/${files.length}…`);
-        const blob = await resizeImage(file);
-        const path = `${coupleId}/galeri/${randomId()}.webp`;
-        const { error: upErr } = await supabase.storage.from("gallery").upload(path, blob, { contentType: "image/webp" });
-        if (upErr) {
-          setError(`Gagal mengunggah ${file.name}: ${upErr.message}`);
-          continue;
-        }
-        paths.push(path);
-      }
-      if (paths.length) {
-        const res = await addPhotos(paths, null);
+      const items: { path: string; thumbPath: string | null }[] = [];
+      let done = 0;
+      setProgress(`Mengunggah 0/${files.length}…`);
+      // Unggah 3 foto sekaligus supaya cepat tapi tidak membebani HP
+      const queue = [...files];
+      await Promise.all(
+        Array.from({ length: Math.min(3, queue.length) }, async () => {
+          for (let file = queue.shift(); file; file = queue.shift()) {
+            const res = await uploadPhoto(supabase, file, `${coupleId}/galeri`);
+            if ("error" in res) setError(`Gagal mengunggah ${file.name}: ${res.error}`);
+            else items.push({ path: res.path, thumbPath: res.thumbPath });
+            done += 1;
+            setProgress(`Mengunggah ${done}/${files.length}…`);
+          }
+        }),
+      );
+      if (items.length) {
+        const res = await addPhotos(items, null);
         if (res.error) setError(res.error);
       }
       setProgress(undefined);
@@ -68,6 +72,19 @@ export function UploadButton({ coupleId }: { coupleId: string }) {
 
 function Lightbox({ photo, onClose }: { photo: GalleryPhoto; onClose: () => void }) {
   const [pending, start] = useTransition();
+  const [full, setFull] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    createClient()
+      .storage.from("gallery")
+      .createSignedUrl(photo.fullPath, 3600)
+      .then(({ data }) => {
+        if (alive && data?.signedUrl) setFull(data.signedUrl);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [photo.fullPath]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onKey);
@@ -97,7 +114,7 @@ function Lightbox({ photo, onClose }: { photo: GalleryPhoto; onClose: () => void
       </div>
       <div className="flex min-h-0 flex-1 items-center justify-center py-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={photo.url} alt={photo.caption ?? "Foto kenangan"} className="max-h-full max-w-full rounded-2xl object-contain" />
+        <img src={full ?? photo.url} alt={photo.caption ?? "Foto kenangan"} className="max-h-full max-w-full rounded-2xl object-contain" />
       </div>
       <p className="text-center text-sm opacity-80">
         {photo.caption ? `${photo.caption} · ` : ""}diunggah {photo.uploader}
@@ -154,7 +171,7 @@ export function GalleryView({ albums, all }: { albums: Album[]; all: GalleryPhot
                     aria-label="Lihat foto"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.url} alt="" loading="lazy" className="size-full object-cover" />
+                    <img src={p.url} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -173,7 +190,7 @@ export function GalleryView({ albums, all }: { albums: Album[]; all: GalleryPhot
           {all.map((p) => (
             <button key={p.id} type="button" onClick={() => setOpen(p)} className="aspect-square overflow-hidden rounded-xl bg-tint" aria-label="Lihat foto">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.url} alt="" loading="lazy" className="size-full object-cover" />
+              <img src={p.url} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
             </button>
           ))}
         </div>

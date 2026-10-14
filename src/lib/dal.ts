@@ -13,52 +13,36 @@ export type Viewer = {
   partner: Profile | null;
 };
 
+type AppContext = {
+  user_id: string;
+  email: string | null;
+  profile: Profile | null;
+  couple: Couple | null;
+  partner: Profile | null;
+} | null;
+
 /**
  * Data Access Layer: satu-satunya tempat membaca sesi.
- * Dibungkus cache() supaya dalam satu request hanya dibaca sekali.
+ * Profil, ruang pasangan, dan profil pasangan diambil dalam SATU panggilan
+ * (fungsi database app_context). Identitas user diverifikasi database dari
+ * token login, jadi aman. Dibungkus cache() supaya per request hanya sekali.
  */
 export const getViewer = cache(async (): Promise<Viewer> => {
   // createClient() membaca cookies(), jadi halaman ini selalu dirender per request.
   const supabase = await createClient();
   if (!isSupabaseConfigured) redirect("/login");
-  const { data } = await supabase.auth.getClaims();
-  const claims = data?.claims;
-  if (!claims?.sub) redirect("/login");
 
-  const userId = claims.sub;
-  const email = typeof claims.email === "string" ? claims.email : "";
+  const { data, error } = await supabase.rpc("app_context");
+  const ctx = data as AppContext;
+  if (error || !ctx?.user_id) redirect("/login");
 
-  const [{ data: profile }, { data: member }] = await Promise.all([
-    supabase.from("profiles").select("id, display_name, avatar_url").eq("id", userId).maybeSingle(),
-    supabase.from("couple_members").select("couple_id").eq("user_id", userId).maybeSingle(),
-  ]);
-
-  let couple: Couple | null = null;
-  let partner: Profile | null = null;
-
-  if (member?.couple_id) {
-    const [{ data: c }, { data: others }] = await Promise.all([
-      supabase.from("couples").select("id, name, anniversary, invite_code, created_at").eq("id", member.couple_id).single(),
-      supabase.from("couple_members").select("user_id").eq("couple_id", member.couple_id).neq("user_id", userId),
-    ]);
-    couple = (c as Couple) ?? null;
-    const partnerId = others?.[0]?.user_id as string | undefined;
-    if (partnerId) {
-      const { data: p } = await supabase
-        .from("profiles")
-        .select("id, display_name, avatar_url")
-        .eq("id", partnerId)
-        .maybeSingle();
-      partner = (p as Profile) ?? null;
-    }
-  }
-
+  const email = ctx.email ?? "";
   return {
-    userId,
+    userId: ctx.user_id,
     email,
-    profile: (profile as Profile) ?? { id: userId, display_name: email.split("@")[0], avatar_url: null },
-    couple,
-    partner,
+    profile: ctx.profile ?? { id: ctx.user_id, display_name: email.split("@")[0], avatar_url: null },
+    couple: ctx.couple,
+    partner: ctx.partner,
   };
 });
 

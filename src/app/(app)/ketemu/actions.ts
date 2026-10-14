@@ -48,14 +48,16 @@ export async function finishCheckin(sessionId: string, mood: string | null, note
   return { ok: true, summary };
 }
 
-export async function addCheckinPhoto(path: string, sessionId: string) {
+export async function addCheckinPhoto(path: string, thumbPath: string | null, sessionId: string) {
   const viewer = await requireCouple();
-  if (!path.startsWith(`${viewer.couple.id}/`)) return { error: "Lokasi foto tidak valid." };
+  const prefix = `${viewer.couple.id}/`;
+  if (!path.startsWith(prefix) || (thumbPath && !thumbPath.startsWith(prefix))) return { error: "Lokasi foto tidak valid." };
   const supabase = await createClient();
   const { error } = await supabase.from("photos").insert({
     couple_id: viewer.couple.id,
     uploaded_by: viewer.userId,
     storage_path: path,
+    thumb_path: thumbPath,
     checkin_session_id: sessionId,
     caption: "Foto dari Mode Ketemu",
   });

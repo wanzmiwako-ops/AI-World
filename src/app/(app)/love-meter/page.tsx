@@ -4,7 +4,7 @@ import { Heart } from "@/components/cat";
 import { Page, PageHeader, PageSkeleton } from "@/components/ui";
 import { requireCouple } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
-import { computeLoveMeter } from "@/lib/love-meter";
+import { computeLoveMeter, type LoveStats } from "@/lib/love-meter";
 import { MoodPicker } from "./mood-picker";
 
 export const metadata: Metadata = { title: "Love Meter" };
@@ -12,9 +12,9 @@ export const metadata: Metadata = { title: "Love Meter" };
 const DAY_NAMES = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 
 async function LoveContent() {
-  const viewer = await requireCouple();
   const supabase = await createClient();
-  const love = await computeLoveMeter(supabase, viewer.couple.id, viewer.userId);
+  const [viewer, { data }] = await Promise.all([requireCouple(), supabase.rpc("love_stats")]);
+  const love = computeLoveMeter(data as LoveStats | null, viewer.userId);
   const c = 2 * Math.PI * 88;
   const dash = `${((c * love.score) / 100).toFixed(1)} ${c.toFixed(1)}`;
 

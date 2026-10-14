@@ -10,7 +10,7 @@ Maskotnya sepasang kucing: **Mochi** (biru) dan **Boba** (oren).
 | Fitur | Isi |
 |---|---|
 | **Login email** | Daftar & masuk pakai email + kata sandi, atau link masuk ke email (tanpa kata sandi). Lupa kata sandi lewat email. |
-| **Pairing pasangan** | Satu orang membuat "ruang berdua" dan mendapat kode undangan 6 karakter, pasangannya bergabung pakai kode itu. Maksimal 2 orang per ruang. |
+| **Pairing pasangan** | Satu orang membuat kode undangan 6 karakter, pasangannya memasukkan kode itu (di halaman awal, Beranda, atau Akun). Kalau dua-duanya terlanjur membuat kode, salah satu tinggal memasukkan kode pasangannya: isi ruangnya otomatis digabung. Maksimal 2 orang per ruang. |
 | **Beranda / Dashboard** | Hari bersama (angka menghitung naik), hitung mundur ke pertemuan berikutnya, Love Meter, topik Ruang Bicara, pesan belum dibaca, ide hari ini, foto terbaru. |
 | **Chat realtime** | Pesan teks, foto, hati, stiker kucing, balasan cepat, status *sedang mengetik*, *online*, dan *dibaca*. |
 | **Kalender pertemuan** | Jadwal ketemu per bulan, tambah/hapus jadwal. Pertemuan yang sudah lewat menampilkan lama ketemu dari Mode Ketemu. |
@@ -38,16 +38,23 @@ Semua data dijaga di database dengan RLS: hanya kalian berdua yang bisa membaca 
 ### 1. Siapkan Supabase
 
 1. Buat project baru di [supabase.com](https://supabase.com) (pilih region **Singapore** biar cepat dari Indonesia).
-2. Buka **SQL Editor** → **New query** → salin seluruh isi file
-   `supabase/migrations/20261013000000_ai_world.sql` → klik **Run**.
-   Ini membuat semua tabel, keamanan (RLS), fungsi check-in, realtime, dan bucket foto.
+2. Buka **SQL Editor** → **New query**, lalu jalankan **semua file** di folder `supabase/migrations` **berurutan**
+   (salin isi file → klik **Run**, lalu file berikutnya):
+   1. `20261013000000_ai_world.sql`: semua tabel, keamanan (RLS), check-in, realtime, bucket foto
+   2. `20261013170000_gabung_pakai_kode.sql`: supaya bisa gabung pakai kode walau sudah sama-sama membuat ruang
+   3. `20261013210000_lebih_cepat.sql`: mempercepat aplikasi (query digabung, index, thumbnail foto)
+
+   > Sudah pernah menjalankan sebagian? Cukup jalankan file yang belum.
 3. Buka **Authentication → URL Configuration**:
    - **Site URL**: `http://localhost:3000` (nanti ganti ke URL Vercel)
    - **Redirect URLs**, tambahkan:
      - `http://localhost:3000/auth/callback`
      - `https://NAMA-APP.vercel.app/auth/callback`
 4. Buka **Project Settings → API Keys**, salin **Project URL** dan **Publishable key**.
-5. (Opsional, lebih aman) **Realtime → Settings**: matikan akses ke channel publik, karena aplikasi ini hanya memakai private channel.
+5. **Project Settings → JWT Keys**: pastikan memakai **JWT Signing Keys (asymmetric)**. Project baru biasanya sudah otomatis.
+   Kalau masih "Legacy JWT secret", klik migrasi. Dengan kunci baru, cek login dilakukan langsung di server Vercel tanpa
+   bertanya ke Supabase setiap kali pindah halaman, jadi jauh lebih cepat.
+6. (Opsional, lebih aman) **Realtime → Settings**: matikan akses ke channel publik, karena aplikasi ini hanya memakai private channel.
 
 ### 2. Jalankan di laptop
 
@@ -83,6 +90,11 @@ git push -u origin main
 
 Setiap `git push` ke `main` akan otomatis ter-deploy ulang.
 
+> **Penting untuk kecepatan:** file `vercel.json` sudah mengatur server Vercel di **Singapura (`sin1`)**, sama dengan
+> lokasi Supabase yang disarankan. Kalau project Supabase-mu ada di region lain, ganti `sin1` ke region Vercel yang paling
+> dekat dengan Supabase-mu. Server dan database yang berjauhan (misal Amerika ↔ Singapura) membuat setiap halaman
+> lambat 1–2 detik.
+
 ### 5. Install di HP
 
 - **iPhone (Safari)**: buka web-nya → tombol Share → **Add to Home Screen**.
@@ -114,6 +126,17 @@ src/
 supabase/migrations/          ← skema database lengkap
 scripts/                      ← pembuat ikon PWA
 ```
+
+## Kenapa cepat
+
+- Server Vercel dan database Supabase di kota yang sama (Singapura).
+- Data akun + pasangan diambil dalam **1 panggilan** database; isi Beranda dan Love Meter juga masing-masing 1 panggilan.
+- Setiap halaman mengambil semua datanya **bersamaan**, tidak antre satu per satu.
+- Foto disimpan dalam 2 ukuran: **thumbnail ±30 KB** untuk grid & chat, foto penuh hanya saat dibuka.
+- Bagian yang lambat (misal foto) dimuat terpisah, jadi isi halaman lain muncul duluan.
+- Ikon menu langsung bereaksi saat diketuk.
+
+> Mode `npm run dev` memang lebih lambat karena kode dikompilasi saat dibuka. Cek kecepatan sebenarnya di versi Vercel.
 
 ## Perintah lain
 

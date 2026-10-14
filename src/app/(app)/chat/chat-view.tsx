@@ -9,7 +9,7 @@ import { Icon } from "@/components/icon";
 import { Avatar } from "@/components/ui";
 import { useCoupleChannel } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
-import { randomId, resizeImage } from "@/lib/image";
+import { randomId, uploadPhoto } from "@/lib/image";
 
 type Person = { id: string; name: string; avatar: string | null };
 
@@ -60,7 +60,7 @@ export function ChatView({
     setMessages((prev) => {
       const without = prev.filter((x) => x.id !== m.id && x.id !== tempId);
       const existing = prev.find((x) => x.id === m.id);
-      const merged = existing ? { ...existing, ...m, url: m.url ?? existing.url } : m;
+      const merged = existing ? { ...existing, ...m, url: m.url ?? existing.url, fullUrl: m.fullUrl ?? existing.fullUrl } : m;
       return [...without, merged].sort((a, b) => a.created_at.localeCompare(b.created_at));
     });
   }, []);
@@ -69,8 +69,11 @@ export function ChatView({
   const resolveUrl = useCallback(
     async (m: ChatMessage) => {
       if (!m.media_path || m.url) return;
-      const { data } = await createClient().storage.from("gallery").createSignedUrl(m.media_path, 3600);
-      if (data?.signedUrl) upsert({ ...m, url: data.signedUrl });
+      const paths = [m.thumb_path, m.media_path].filter((p): p is string => Boolean(p));
+      const { data } = await createClient().storage.from("gallery").createSignedUrls(paths, 3600);
+      const map = Object.fromEntries((data ?? []).map((d) => [d.path, d.signedUrl]));
+      const full = map[m.media_path];
+      if (full) upsert({ ...m, url: (m.thumb_path && map[m.thumb_path]) || full, fullUrl: full });
     },
     [upsert],
   );
@@ -128,7 +131,7 @@ export function ChatView({
     void channelRef.current?.send({ type: "broadcast", event: "typing", payload: { user: me.id } });
   }
 
-  function send(kind: ChatMessage["kind"], body: string | null, mediaPath: string | null = null, localUrl?: string) {
+  function send(kind: ChatMessage["kind"], body: string | null, mediaPath: string | null = null, localUrl?: string, thumbPath: string | null = null) {
     setError(undefined);
     stickToBottom.current = true;
     const tempId = `temp-${randomId()}`;
@@ -139,12 +142,13 @@ export function ChatView({
       kind,
       body,
       media_path: mediaPath,
+      thumb_path: thumbPath,
       created_at: new Date().toISOString(),
       read_at: null,
       url: localUrl,
     });
     startTransition(async () => {
-      const res = await sendMessage({ kind, body, mediaPath });
+      const res = await sendMessage({ kind, body, mediaPath, thumbPath });
       if (res.error || !res.message) {
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
         setError(res.error ?? "Pesan gagal terkirim.");
@@ -167,11 +171,9 @@ export function ChatView({
     e.target.value = "";
     if (!file) return;
     startTransition(async () => {
-      const blob = await resizeImage(file);
-      const path = `${coupleId}/chat/${randomId()}.webp`;
-      const { error: upErr } = await createClient().storage.from("gallery").upload(path, blob, { contentType: "image/webp" });
-      if (upErr) return setError(`Foto gagal diunggah: ${upErr.message}`);
-      send("photo", null, path, URL.createObjectURL(blob));
+      const up = await uploadPhoto(createClient(), file, `${coupleId}/chat`);
+      if ("error" in up) return setError(`Foto gagal diunggah: ${up.error}`);
+      send("photo", null, up.path, up.localUrl, up.thumbPath);
     });
   }
 
@@ -252,10 +254,10 @@ export function ChatView({
                   </span>
                 )}
                 {m.kind === "photo" && (
-                  <a href={m.url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-[22px] bg-white p-1.5 shadow-soft">
+                  <a href={m.fullUrl ?? m.url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-[22px] bg-white p-1.5 shadow-soft">
                     {m.url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={m.url} alt="Foto dari chat" className="max-h-64 w-56 rounded-[17px] object-cover" />
+                      <img src={m.url} alt="Foto dari chat" loading="lazy" decoding="async" className="max-h-64 w-56 rounded-[17px] object-cover" />
                     ) : (
                       <span className="flex h-40 w-56 items-center justify-center rounded-[17px] bg-tint text-ocean">
                         <Icon name="image" size={30} />

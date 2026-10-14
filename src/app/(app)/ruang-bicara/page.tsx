@@ -11,14 +11,15 @@ import { IssueCard, IssueForm, type IssueItem } from "./issue-views";
 export const metadata: Metadata = { title: "Ruang Bicara" };
 
 async function IssuesContent() {
-  const viewer = await requireCouple();
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("issues")
-    .select("id, title, category, feeling, status, agreement, created_by, created_at, resolved_at, issue_responses(issue_id, user_id, feeling, created_at)")
-    .eq("couple_id", viewer.couple.id)
-    .order("created_at", { ascending: false })
-    .limit(50);
+  const [viewer, { data }] = await Promise.all([
+    requireCouple(),
+    supabase
+      .from("issues")
+      .select("id, title, category, feeling, status, agreement, created_by, created_at, resolved_at, issue_responses(issue_id, user_id, feeling, created_at)")
+      .order("created_at", { ascending: false })
+      .limit(50),
+  ]);
 
   const partnerName = viewer.partner?.display_name ?? "pasanganmu";
   const items: IssueItem[] = ((data ?? []) as (Issue & { issue_responses: IssueResponse[] })[]).map((i) => {

@@ -5,43 +5,58 @@ import { CountUp } from "@/components/count-up";
 import { Icon } from "@/components/icon";
 import { Avatar, Bubbles, Page, PageSkeleton } from "@/components/ui";
 import { CopyCode } from "@/app/(app)/akun/account-forms";
+import { JoinCodeForm } from "@/components/join-code-form";
 import { requireCouple } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
-import { computeLoveMeter } from "@/lib/love-meter";
+import { computeLoveMeter, type LoveStats } from "@/lib/love-meter";
 import { dayKey, daysBetween, formatDay, formatShort, formatTime } from "@/lib/dates";
 import { ideaOfTheDay } from "@/lib/ideas";
 import { signedUrls } from "@/lib/storage";
 import type { Meeting, Photo } from "@/lib/types";
 
-async function Dashboard() {
-  const viewer = await requireCouple();
+type DashboardData = {
+  next_meeting: Pick<Meeting, "id" | "title" | "place" | "starts_at"> | null;
+  open_issues: number;
+  unread: number;
+  photos: Pick<Photo, "id" | "storage_path" | "thumb_path" | "created_at">[];
+  love: LoveStats | null;
+};
+
+/** Foto terbaru dimuat terpisah, jadi sisa Beranda tidak menunggu foto. */
+async function RecentPhotos({ photos }: { photos: DashboardData["photos"] }) {
+  if (!photos.length) {
+    return <p className="text-sm text-muted">Belum ada foto. Foto pertama kalian bisa diunggah dari Galeri atau saat Mode Ketemu.</p>;
+  }
   const supabase = await createClient();
-  const coupleId = viewer.couple.id;
+  const urls = await signedUrls(supabase, photos.map((p) => p.thumb_path ?? p.storage_path));
+  return (
+    <div className="grid grid-cols-4 gap-2">
+      {photos.map((p) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={p.id}
+          src={urls[p.thumb_path ?? p.storage_path]}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="aspect-square w-full rounded-2xl bg-tint object-cover"
+        />
+      ))}
+    </div>
+  );
+}
+
+async function Dashboard() {
+  const supabase = await createClient();
+  // Data akun & isi Beranda diambil bersamaan (keamanan dijaga RLS di database).
+  const [viewer, { data }] = await Promise.all([requireCouple(), supabase.rpc("dashboard_data")]);
+  const d = (data ?? { next_meeting: null, open_issues: 0, unread: 0, photos: [], love: null }) as DashboardData;
   const now = new Date();
 
-  const [nextRes, love, openIssues, unread, photosRes] = await Promise.all([
-    supabase
-      .from("meetings")
-      .select("id, title, place, starts_at")
-      .eq("couple_id", coupleId)
-      .gte("starts_at", now.toISOString())
-      .order("starts_at")
-      .limit(1)
-      .maybeSingle(),
-    computeLoveMeter(supabase, coupleId, viewer.userId),
-    supabase.from("issues").select("id", { count: "exact", head: true }).eq("couple_id", coupleId).neq("status", "resolved"),
-    supabase
-      .from("messages")
-      .select("id", { count: "exact", head: true })
-      .eq("couple_id", coupleId)
-      .neq("sender_id", viewer.userId)
-      .is("read_at", null),
-    supabase.from("photos").select("id, storage_path, created_at").eq("couple_id", coupleId).order("created_at", { ascending: false }).limit(4),
-  ]);
-
-  const next = nextRes.data as Pick<Meeting, "id" | "title" | "place" | "starts_at"> | null;
-  const photos = (photosRes.data ?? []) as Pick<Photo, "id" | "storage_path" | "created_at">[];
-  const urls = await signedUrls(supabase, photos.map((p) => p.storage_path));
+  const love = computeLoveMeter(d.love, viewer.userId, now);
+  const next = d.next_meeting;
+  const openIssues = { count: d.open_issues };
+  const unread = { count: d.unread };
   const days = Math.max(0, daysBetween(viewer.couple.anniversary ?? viewer.couple.created_at, now));
   const daysToNext = next ? daysBetween(now, next.starts_at) : null;
   const idea = ideaOfTheDay(dayKey(now));
@@ -65,10 +80,16 @@ async function Dashboard() {
       </header>
 
       {!viewer.partner && (
-        <section className="card flex animate-rise flex-col gap-3 bg-sand-soft p-5">
-          <h2 className="font-display text-lg font-medium">Pasanganmu belum bergabung</h2>
-          <p className="text-sm text-sand-ink">Kirim kode ini supaya dia bisa daftar dan tersambung ke ruang kalian.</p>
-          <CopyCode code={viewer.couple.invite_code} />
+        <section className="card grid animate-rise gap-5 bg-sand-soft p-5 lg:grid-cols-2">
+          <div className="flex flex-col gap-3">
+            <h2 className="font-display text-lg font-medium">Sambungkan dengan pasanganmu</h2>
+            <p className="text-sm text-sand-ink">Kirim kode undanganmu ini ke dia…</p>
+            <CopyCode code={viewer.couple.invite_code} />
+          </div>
+          <div className="flex flex-col gap-3 border-t border-sand pt-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-5">
+            <p className="text-sm text-sand-ink">…atau kalau dia sudah punya kode sendiri, masukkan kodenya di sini.</p>
+            <JoinCodeForm compact />
+          </div>
         </section>
       )}
 
@@ -170,16 +191,9 @@ async function Dashboard() {
           <h2 className="font-display text-xl font-medium">Kenangan terbaru</h2>
           <Link href="/galeri" className="text-sm font-bold text-ocean">Galeri</Link>
         </div>
-        {photos.length ? (
-          <div className="grid grid-cols-4 gap-2">
-            {photos.map((p) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={p.id} src={urls[p.storage_path]} alt="" className="aspect-square w-full rounded-2xl bg-tint object-cover" />
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted">Belum ada foto. Foto pertama kalian bisa diunggah dari Galeri atau saat Mode Ketemu.</p>
-        )}
+        <Suspense fallback={<div className="grid grid-cols-4 gap-2">{[0, 1, 2, 3].map((i) => <div key={i} className="aspect-square animate-pulse rounded-2xl bg-tint" />)}</div>}>
+          <RecentPhotos photos={d.photos} />
+        </Suspense>
       </section>
     </>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { Icon, type IconName } from "@/components/icon";
@@ -27,6 +27,16 @@ const BOTTOM: NavItem[] = [
   { href: "/galeri", label: "Galeri", icon: "image" },
   { href: "/chat", label: "Chat", icon: "chat" },
 ];
+
+/** Ikon menu yang langsung bereaksi saat diketuk, sebelum halaman selesai dimuat. */
+function NavIcon({ name, size = 22 }: { name: IconName; size?: number }) {
+  const { pending } = useLinkStatus();
+  return (
+    <span className={`inline-flex transition-transform duration-150 ${pending ? "scale-90 opacity-60" : ""}`} style={pending ? { animation: "bob 0.6s ease-in-out infinite" } : undefined}>
+      <Icon name={name} size={size} />
+    </span>
+  );
+}
 
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
@@ -55,7 +65,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   active ? "bg-tint font-bold text-ocean" : "font-medium text-ink-soft hover:bg-sky"
                 }`}
               >
-                <Icon name={item.icon} size={20} />
+                <NavIcon name={item.icon} size={20} />
                 {item.label}
               </Link>
             );
@@ -83,7 +93,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   className={`flex flex-col items-center gap-1 text-[11px] font-bold ${active ? "text-ocean" : "text-navy"}`}
                 >
                   <span className="-mt-8 flex size-[60px] items-center justify-center rounded-full border-[5px] border-sky bg-ocean text-white shadow-ocean">
-                    <Icon name="pin" size={26} />
+                    <NavIcon name="pin" size={26} />
                   </span>
                   {item.label}
                 </Link>
@@ -97,7 +107,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 className={`flex flex-col items-center gap-1 text-[11px] ${active ? "font-bold text-ocean" : "font-medium text-muted"}`}
               >
                 <span className={`flex h-[30px] w-12 items-center justify-center rounded-full ${active ? "bg-tint" : ""}`}>
-                  <Icon name={item.icon} size={22} />
+                  <NavIcon name={item.icon} size={22} />
                 </span>
                 {item.label}
               </Link>

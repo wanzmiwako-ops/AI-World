@@ -5,6 +5,7 @@ import { Cat } from "@/components/cat";
 import { Icon } from "@/components/icon";
 import { FormMessage, Page, PageHeader, PageSkeleton } from "@/components/ui";
 import { getViewer } from "@/lib/dal";
+import { JoinCodeForm } from "@/components/join-code-form";
 import { signOut } from "./actions";
 import { AvatarEditor, CopyCode, CoupleForm, PasswordForm, ProfileForm } from "./account-forms";
 
@@ -43,9 +44,15 @@ async function AccountContent({ searchParams }: { searchParams: PageProps<"/akun
                 )}
               </p>
               {!viewer.partner && (
-                <div className="rounded-[22px] bg-tint p-2">
-                  <CopyCode code={viewer.couple.invite_code} />
-                </div>
+                <>
+                  <div className="rounded-[22px] bg-tint p-2">
+                    <CopyCode code={viewer.couple.invite_code} />
+                  </div>
+                  <div className="flex flex-col gap-2 rounded-[22px] bg-sky p-4">
+                    <p className="text-sm text-ink-soft">Pasanganmu juga sudah punya kode? Masukkan kodenya di sini:</p>
+                    <JoinCodeForm compact />
+                  </div>
+                </>
               )}
               <CoupleForm anniversary={viewer.couple.anniversary} />
             </>

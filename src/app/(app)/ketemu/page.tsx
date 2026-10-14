@@ -9,19 +9,24 @@ import { CheckinView } from "./checkin-view";
 
 export const metadata: Metadata = { title: "Mode Ketemu" };
 
+type SessionRow = Pick<CheckinSession, "id" | "together_at" | "place"> & {
+  checkin_participants: { user_id: string }[];
+  photos: { count: number }[];
+};
+
 async function CheckinContent() {
-  const viewer = await requireCouple();
   const supabase = await createClient();
   const since = hoursAgoIso(12);
   const today = dayKey();
   const dayStart = new Date(`${today}T00:00:00+07:00`).toISOString();
   const dayEnd = new Date(new Date(dayStart).getTime() + 86_400_000).toISOString();
 
-  const [sessionRes, planRes] = await Promise.all([
+  // Sesi aktif + peserta + jumlah foto dalam satu query, paralel dengan data akun.
+  const [viewer, sessionRes, planRes] = await Promise.all([
+    requireCouple(),
     supabase
       .from("checkin_sessions")
-      .select("id, together_at, place, created_at, ended_at")
-      .eq("couple_id", viewer.couple.id)
+      .select("id, together_at, place, checkin_participants(user_id), photos(count)")
       .is("ended_at", null)
       .gte("created_at", since)
       .order("created_at", { ascending: false })
@@ -30,7 +35,6 @@ async function CheckinContent() {
     supabase
       .from("meetings")
       .select("title, place")
-      .eq("couple_id", viewer.couple.id)
       .gte("starts_at", dayStart)
       .lt("starts_at", dayEnd)
       .order("starts_at")
@@ -38,19 +42,12 @@ async function CheckinContent() {
       .maybeSingle(),
   ]);
 
-  const session = sessionRes.data as Pick<CheckinSession, "id" | "together_at" | "place"> | null;
-  let iAmIn = false;
-  let partnerIn = false;
-  let photos = 0;
-  if (session) {
-    const [{ data: parts }, { count }] = await Promise.all([
-      supabase.from("checkin_participants").select("user_id").eq("session_id", session.id),
-      supabase.from("photos").select("id", { count: "exact", head: true }).eq("checkin_session_id", session.id),
-    ]);
-    iAmIn = Boolean(parts?.some((p) => p.user_id === viewer.userId));
-    partnerIn = Boolean(parts?.some((p) => p.user_id !== viewer.userId));
-    photos = count ?? 0;
-  }
+  const row = sessionRes.data as SessionRow | null;
+  const session = row ? { id: row.id, together_at: row.together_at, place: row.place } : null;
+  const parts = row?.checkin_participants ?? [];
+  const iAmIn = parts.some((p) => p.user_id === viewer.userId);
+  const partnerIn = parts.some((p) => p.user_id !== viewer.userId);
+  const photos = row?.photos?.[0]?.count ?? 0;
 
   return (
     <CheckinView

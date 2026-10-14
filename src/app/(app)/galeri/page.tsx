@@ -17,21 +17,22 @@ async function Upload() {
 }
 
 async function GalleryContent() {
-  const viewer = await requireCouple();
   const supabase = await createClient();
-  const [photosRes, meetingsRes, sessionsRes] = await Promise.all([
+  // Semua diambil bersamaan; RLS di database memastikan hanya data ruang kalian.
+  const [viewer, photosRes, meetingsRes, sessionsRes] = await Promise.all([
+    requireCouple(),
     supabase
       .from("photos")
-      .select("id, storage_path, caption, uploaded_by, created_at, checkin_session_id")
-      .eq("couple_id", viewer.couple.id)
+      .select("id, storage_path, thumb_path, caption, uploaded_by, created_at, checkin_session_id")
       .order("created_at", { ascending: false })
-      .limit(300),
-    supabase.from("meetings").select("id, title, place, starts_at").eq("couple_id", viewer.couple.id),
-    supabase.from("checkin_sessions").select("id, together_at, ended_at, place").eq("couple_id", viewer.couple.id),
+      .limit(150),
+    supabase.from("meetings").select("id, title, place, starts_at").order("starts_at", { ascending: false }).limit(200),
+    supabase.from("checkin_sessions").select("id, together_at, ended_at, place").not("together_at", "is", null).order("created_at", { ascending: false }).limit(200),
   ]);
 
   const photos = (photosRes.data ?? []) as Photo[];
-  const urls = await signedUrls(supabase, photos.map((p) => p.storage_path));
+  // Grid cukup pakai thumbnail kecil; foto penuh baru dimuat saat dibuka.
+  const urls = await signedUrls(supabase, photos.map((p) => p.thumb_path ?? p.storage_path));
   const names: Record<string, string> = { [viewer.userId]: "kamu" };
   if (viewer.partner) names[viewer.partner.id] = viewer.partner.display_name;
 
@@ -41,7 +42,8 @@ async function GalleryContent() {
 
   const toItem = (p: Photo): GalleryPhoto => ({
     id: p.id,
-    url: urls[p.storage_path] ?? "",
+    url: urls[p.thumb_path ?? p.storage_path] ?? "",
+    fullPath: p.storage_path,
     caption: p.caption,
     uploader: names[p.uploaded_by] ?? "pasangan",
   });
@@ -78,7 +80,7 @@ async function GalleryContent() {
       {throwback && (
         <section className="flex animate-rise items-center gap-4 rounded-[26px] bg-sand-soft p-3.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={urls[throwback[0].storage_path]} alt="" className="size-[72px] -rotate-3 rounded-[20px] object-cover" style={{ animation: "wiggle 3s ease-in-out infinite" }} />
+          <img src={urls[throwback[0].thumb_path ?? throwback[0].storage_path]} alt="" className="size-[72px] -rotate-3 rounded-[20px] object-cover" style={{ animation: "wiggle 3s ease-in-out infinite" }} />
           <div className="flex flex-col">
             <span className="text-[13px] font-bold text-sand-ink">Setahun lalu hari ini</span>
             <span className="font-display text-lg font-medium">{meetingByDay.get(lastYear)?.title ?? "Kenangan kalian"}</span>
