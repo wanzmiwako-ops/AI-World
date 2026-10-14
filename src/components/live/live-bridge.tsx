@@ -1,9 +1,9 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { heartbeat, markAway, saveNativeToken } from "@/app/(app)/live-actions";
+import { heartbeat, saveNativeToken } from "@/app/(app)/live-actions";
 import { isNativeApp, nativeStatusBar, startNative } from "@/lib/native";
 import { channels, emitLive, pushToast, setLive, useLive, type Person } from "@/lib/live";
 import { haptic, play, primeAudio } from "@/lib/feel";
@@ -14,6 +14,14 @@ import { Toaster } from "./toaster";
 import { NudgeOverlay } from "./nudge-overlay";
 
 const MOOD = ["", "jauh", "biasa", "baik", "dekat", "lengket banget"];
+
+/** Tandai "tidak aktif" walau halaman sedang dibekukan (beacon tetap terkirim). */
+function sendAway() {
+  try {
+    if (navigator.sendBeacon?.("/api/away")) return;
+  } catch {}
+  void fetch("/api/away", { method: "POST", keepalive: true }).catch(() => {});
+}
 
 function preview(kind: string, body: unknown) {
   if (kind === "photo") return "Mengirim foto";
@@ -75,8 +83,15 @@ export function LiveBridge({
     void startNative({
       navigate: (url) => router.push(url),
       saveToken: (token, platform) => saveNativeToken(token, platform),
-      away: () => void markAway().catch(() => {}),
+      away: sendAway,
       back: () => router.back(),
+      // Kabar biasa (chat, kangen, dll.) sudah muncul lewat realtime; yang ini untuk notifikasi uji
+      foreground: (n) => {
+        if (n.tag !== "test") return;
+        pushToast({ title: n.title, body: n.body, href: n.url, tone: "aqua", cat: "mochi" });
+        play("meow");
+        haptic([30, 40, 30]);
+      },
     });
   }, [router]);
 
@@ -108,7 +123,43 @@ export function LiveBridge({
     void channels.events?.track({ page: pathname, at: Date.now() });
   }, [pathname]);
 
-  // Koneksi realtime
+  // Koneksi realtime. `conn` naik → koneksi dibuat ulang dari nol
+  // (dipakai saat koneksi putus, token kedaluwarsa, atau aplikasi kembali dari latar belakang).
+  const [conn, setConn] = useState(0);
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const attempts = useRef(0);
+  const reconnect = useCallback(() => {
+    if (reconnectTimer.current) return;
+    // jeda makin lama kalau gagal terus (1,5 dtk → maks. 30 dtk), supaya tidak membebani server
+    const delay = Math.min(30_000, 1500 * 2 ** attempts.current);
+    attempts.current += 1;
+    reconnectTimer.current = setTimeout(() => {
+      reconnectTimer.current = null;
+      setConn((c) => c + 1);
+    }, delay);
+  }, []);
+
+  // Kembali ke aplikasi / internet nyambung lagi → pastikan koneksi realtime masih hidup
+  useEffect(() => {
+    const check = (e?: Event) => {
+      if (document.visibilityState !== "visible") return;
+      const ok = channels.chat?.state === "joined" && channels.events?.state === "joined";
+      if (ok) return;
+      if (e) attempts.current = 0; // pengguna baru kembali: sambung ulang secepatnya
+      reconnect();
+    };
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("online", check);
+    window.addEventListener("focus", check);
+    const t = setInterval(() => check(), 20_000);
+    return () => {
+      document.removeEventListener("visibilitychange", check);
+      window.removeEventListener("online", check);
+      window.removeEventListener("focus", check);
+      clearInterval(t);
+    };
+  }, [reconnect]);
+
   useEffect(() => {
     const supabase = createClient();
     let cancelled = false;
@@ -121,8 +172,15 @@ export function LiveBridge({
       haptic([30, 40, 30]);
     }
 
+    const onStatus = (status: string) => {
+      if (cancelled) return;
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") reconnect();
+    };
+
     (async () => {
-      await supabase.realtime.setAuth();
+      // Pastikan token login masih segar (bisa kedaluwarsa saat HP lama di latar belakang)
+      await supabase.auth.getSession().catch(() => null);
+      await supabase.realtime.setAuth().catch(() => {});
       if (cancelled) return;
 
       chat = supabase.channel(`couple:${coupleId}:chat`, { config: { private: true } });
@@ -136,7 +194,14 @@ export function LiveBridge({
         })
         .on("broadcast", { event: "message_update" }, ({ payload }: { payload: Record<string, unknown> }) => emitLive("message_update", payload))
         .on("broadcast", { event: "typing" }, ({ payload }: { payload: Record<string, unknown> }) => emitLive("typing", payload))
-        .subscribe();
+        .subscribe((status: string) => {
+          onStatus(status);
+          // tersambung lagi setelah putus → halaman mengambil pesan yang terlewat
+          if (status === "SUBSCRIBED") {
+            attempts.current = 0;
+            if (conn > 0) emitLive("resync", {});
+          }
+        });
 
       events = supabase.channel(`couple:${coupleId}:events`, { config: { private: true, presence: { key: me.id } } });
       events
@@ -209,6 +274,7 @@ export function LiveBridge({
           setLive({ partnerOnline: Boolean(p?.length), partnerPage: p?.[p.length - 1]?.page ?? null });
         })
         .subscribe(async (status: string) => {
+          onStatus(status);
           if (status === "SUBSCRIBED") await events!.track({ page: pathRef.current, at: Date.now() });
         });
 
@@ -223,7 +289,7 @@ export function LiveBridge({
       if (chat) void supabase.removeChannel(chat);
       if (events) void supabase.removeChannel(events);
     };
-  }, [coupleId, me.id, partnerId]);
+  }, [coupleId, me.id, partnerId, conn, reconnect]);
 
   // Denyut: tandai online, perpanjang kunci PIN, dan kunci lagi kalau sudah lewat batas
   useEffect(() => {
@@ -238,13 +304,13 @@ export function LiveBridge({
     }
     function start() {
       if (timer) clearInterval(timer);
-      timer = setInterval(beat, 30_000);
+      timer = setInterval(beat, 20_000);
     }
     function onVisibility() {
       if (document.visibilityState === "hidden") {
         hiddenAt = Date.now();
         // langsung tandai "tidak aktif" supaya pesan berikutnya jadi notifikasi
-        void markAway().catch(() => {});
+        sendAway();
         if (timer) clearInterval(timer);
         timer = null;
         return;

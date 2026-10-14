@@ -33,7 +33,7 @@ export function NudgeOverlay({ partnerName }: { partnerName: string }) {
   if (!nudge) return null;
   return (
     <div className="fixed inset-0 z-[85] flex items-center justify-center p-6" role="dialog" aria-label={`${partnerName} ${TEXT[nudge.kind] ?? ""}`}>
-      <button type="button" aria-label="Tutup" className="absolute inset-0 bg-navy/40 backdrop-blur-[2px]" onClick={() => setLive({ nudge: null })} style={{ animation: "fade-in .2s ease both" }} />
+      <button type="button" aria-label="Tutup" className="absolute inset-0 bg-navy/50" onClick={() => setLive({ nudge: null })} style={{ animation: "fade-in .2s ease both" }} />
       <div className="relative flex w-full max-w-sm flex-col items-center gap-3 rounded-[32px] bg-white px-6 pt-8 pb-6 text-center shadow-[0_20px_60px_rgba(11,37,69,0.3)]" style={{ animation: "pop-in .45s cubic-bezier(.2,.9,.3,1.3) both" }}>
         <CatPair size={96} motion="hop" moods={["love", "love"]} />
         <p className="pt-2 font-display text-[26px] leading-tight font-semibold">

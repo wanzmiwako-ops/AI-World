@@ -20,11 +20,20 @@ const ITEMS = [
 export function ThemeBackdrop() {
   return (
     <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-      <span className="absolute -top-40 -left-32 size-[520px] rounded-full bg-tint opacity-80 blur-3xl" />
-      <span className="absolute top-1/3 -right-40 size-[560px] rounded-full bg-aqua-soft opacity-70 blur-3xl" />
-      <span className="absolute -bottom-48 left-1/4 size-[520px] rounded-full bg-pink-soft opacity-60 blur-3xl" />
-      <span className="absolute -bottom-32 -right-24 size-[360px] rounded-full bg-sand-soft opacity-70 blur-3xl" />
-      <div className="absolute inset-0 opacity-30 lg:opacity-45">
+      {/* Gradasi lembut (tanpa filter blur: blur besar membuat HP berat & layar bisa "kepotong") */}
+      <span
+        className="absolute inset-0"
+        style={{
+          background: [
+            "radial-gradient(520px circle at 0% 0%, color-mix(in oklab, var(--color-tint) 85%, transparent), transparent 70%)",
+            "radial-gradient(560px circle at 100% 45%, color-mix(in oklab, var(--color-aqua-soft) 75%, transparent), transparent 70%)",
+            "radial-gradient(520px circle at 30% 100%, color-mix(in oklab, var(--color-pink-soft) 65%, transparent), transparent 70%)",
+            "radial-gradient(360px circle at 100% 100%, color-mix(in oklab, var(--color-sand-soft) 75%, transparent), transparent 70%)",
+          ].join(","),
+        }}
+      />
+      {/* Hiasan melayang hanya di layar besar */}
+      <div className="absolute inset-0 hidden opacity-45 lg:block">
         {ITEMS.map((it, i) => (
           <span
             key={i}

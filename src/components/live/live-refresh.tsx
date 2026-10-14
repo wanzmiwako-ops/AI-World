@@ -12,12 +12,18 @@ export function LiveRefresh({ kinds }: { kinds: string[] }) {
   const router = useRouter();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const schedule = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => router.refresh(), 700);
+  };
+
   useLiveEvent("activity", (p) => {
     if (!kinds.includes(String(p.kind))) return;
     if (p.by && p.by === getLive().me?.id) return;
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => router.refresh(), 700);
+    schedule();
   });
+  // Koneksi sempat putus → mungkin ada perubahan yang terlewat
+  useLiveEvent("resync", schedule);
 
   return null;
 }

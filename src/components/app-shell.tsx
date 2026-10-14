@@ -93,7 +93,7 @@ function BottomNav({ pathname }: { pathname: string }) {
   return (
     <nav
       aria-label="Navigasi utama"
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 items-center rounded-t-[28px] bg-white/95 pt-2 shadow-[0_-6px_24px_rgba(11,37,69,0.08)] backdrop-blur select-none lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 items-center rounded-t-[28px] bg-white pt-2 shadow-[0_-6px_24px_rgba(11,37,69,0.08)] select-none lg:hidden"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 12px)", transform: "translateZ(0)" }}
     >
       {BOTTOM.map((item) => {
@@ -144,7 +144,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-svh lg:flex">
       <ThemeBackdrop />
       {/* Sidebar untuk PC */}
-      <aside className="sticky top-0 hidden h-svh w-64 shrink-0 flex-col gap-6 overflow-y-auto bg-white/90 px-4 py-7 backdrop-blur select-none lg:flex">
+      <aside className="sticky top-0 hidden h-svh w-64 shrink-0 flex-col gap-6 overflow-y-auto bg-white px-4 py-7 select-none lg:flex">
         <Link href="/" className="px-3">
           <Logo size={38} textClass="text-[22px]" />
         </Link>

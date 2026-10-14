@@ -27,7 +27,7 @@ export function Toaster() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-[22px] border-l-4 bg-white/95 py-3 pr-2 pl-3 shadow-[0_12px_32px_rgba(11,37,69,0.18)] backdrop-blur ${TONE[t.tone ?? "ocean"]}`}
+          className={`pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-[22px] border-l-4 bg-white py-3 pr-2 pl-3 shadow-[0_12px_32px_rgba(11,37,69,0.18)] ${TONE[t.tone ?? "ocean"]}`}
           style={{ animation: "toast-in .38s cubic-bezier(.2,.9,.3,1.2) both" }}
         >
           <button

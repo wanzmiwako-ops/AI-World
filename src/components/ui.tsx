@@ -1,13 +1,14 @@
 import Link from "next/link";
-import { ViewTransition, type CSSProperties, type ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Icon } from "@/components/icon";
 
-/** Lebar konten halaman: penuh di HP, lega di PC. Pindah halaman memudar halus. */
+/**
+ * Lebar konten halaman: penuh di HP, lega di PC. Pindah halaman memudar halus (CSS biasa,
+ * bukan View Transitions: lebih ringan & tidak membuat layar "membeku" di WebView Android).
+ */
 export function Page({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <ViewTransition enter="page" exit="page" default="none">
-      <div className={`mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 sm:px-5 lg:gap-5 lg:px-10 2xl:px-8 ${className}`}>{children}</div>
-    </ViewTransition>
+    <div className={`page-in mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 sm:px-5 lg:gap-5 lg:px-10 2xl:px-8 ${className}`}>{children}</div>
   );
 }
 
@@ -15,7 +16,7 @@ export function Page({ children, className = "" }: { children: ReactNode; classN
 export function AppBar({ children }: { children: ReactNode }) {
   return (
     <header
-      className="sticky top-0 z-30 -mx-4 flex items-center gap-3 bg-sky/90 px-4 pb-3 backdrop-blur-md sm:-mx-5 sm:px-5 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:pt-8 lg:backdrop-blur-none"
+      className="sticky top-0 z-30 -mx-4 flex items-center gap-3 bg-sky/95 px-4 pb-3 sm:-mx-5 sm:px-5 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:pt-8"
       style={{ paddingTop: "max(calc(env(safe-area-inset-top) + 10px), 18px)" }}
     >
       {children}
