@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { Heart } from "@/components/cat";
 import { CountUp } from "@/components/count-up";
 import { Icon } from "@/components/icon";
-import { AppBar, Avatar, Bubbles, Page, PageSkeleton } from "@/components/ui";
+import { AppBar, Avatar, Bubbles, Page, PageSkeleton, ThemeArt } from "@/components/ui";
 import { PetCats } from "@/components/pet-cats";
 import { NudgeBar } from "@/components/nudge-bar";
 import { PartnerStatus } from "@/components/partner-status";
@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { computeLoveMeter, type LoveStats } from "@/lib/love-meter";
 import { dayKey, daysBetween, formatDay, formatShort, formatTime } from "@/lib/dates";
 import { ideaOfTheDay } from "@/lib/ideas";
+import { GAMES } from "@/lib/games/catalog";
 import { signedUrls } from "@/lib/storage";
 import type { Meeting, Photo } from "@/lib/types";
 
@@ -114,9 +115,10 @@ async function Dashboard() {
       )}
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <section className="relative flex animate-rise flex-col gap-4 overflow-hidden rounded-[30px] bg-ocean p-6 text-white lg:col-span-2">
-          <span aria-hidden="true" className="absolute -top-12 -right-10 size-48 rounded-full bg-aqua/30" />
+        <section className="hero relative flex animate-rise flex-col gap-4 overflow-hidden rounded-[30px] p-6 lg:col-span-2">
+          <span aria-hidden="true" className="absolute -top-12 -right-10 size-48 rounded-full opacity-30" style={{ background: "var(--glow)" }} />
           <Bubbles />
+          <ThemeArt className="right-[38%] -bottom-5 hidden opacity-25 sm:block" size={110} />
           <div className="relative flex items-end justify-between gap-2">
             <div className="flex flex-col">
               <span className="text-sm font-medium opacity-90">
@@ -137,7 +139,7 @@ async function Dashboard() {
               ? `${daysToNext === 0 ? "Ketemu hari ini" : `Ketemu lagi ${formatShort(next.starts_at)} · ${daysToNext} hari lagi`}`
               : "Belum ada jadwal ketemu, yuk atur!"}
           </Link>
-          <Link href="/ketemu" className="btn tap relative bg-white text-ocean">
+          <Link href="/ketemu" className="btn tap relative bg-white text-ocean-dark">
             <Icon name="pin" size={20} /> Check-in ketemu
           </Link>
         </section>
@@ -205,6 +207,31 @@ async function Dashboard() {
               {next ? `${formatShort(next.starts_at)} · ${formatTime(next.starts_at)}${next.place ? ` · ${next.place}` : ""}` : "Biar ada yang ditunggu"}
             </span>
           </span>
+        </Link>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Link href="/main" className="tap relative flex animate-rise items-center gap-4 overflow-hidden rounded-[26px] bg-pink-soft p-5 lg:col-span-2">
+          <span className="flex shrink-0 -space-x-2 text-[30px]" aria-hidden="true">
+            {GAMES.slice(0, 3).map((g, i) => (
+              <span key={g.kind} className="flex size-12 items-center justify-center rounded-2xl bg-white shadow-soft" style={{ animation: `bob ${2.6 + i * 0.4}s ease-in-out ${i * 0.2}s infinite` }}>
+                {g.emoji}
+              </span>
+            ))}
+          </span>
+          <span className="flex min-w-0 flex-col">
+            <span className="font-display text-lg font-semibold">Main bareng {partnerName}</span>
+            <span className="text-[13px] text-ink-soft">TTS, UNO Kucing, Kita Sehati?, XO, Kartu Ngobrol</span>
+          </span>
+          <span className="ml-auto hidden shrink-0 sm:block"><Icon name="next" /></span>
+        </Link>
+        <Link href="/tema" className="hero tap relative flex animate-rise items-center gap-4 overflow-hidden rounded-[26px] p-5">
+          <span aria-hidden="true" className="theme-art text-[40px] leading-none" style={{ animation: "wiggle 3s ease-in-out infinite" }} />
+          <span className="flex min-w-0 flex-col">
+            <span className="text-xs font-bold tracking-wide uppercase opacity-80">Tema dunia</span>
+            <span className="theme-name font-display text-lg font-semibold" />
+          </span>
+          <span className="ml-auto shrink-0"><Icon name="palette" /></span>
         </Link>
       </div>
 

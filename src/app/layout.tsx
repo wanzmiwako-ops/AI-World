@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "@fontsource-variable/fredoka";
 import "@fontsource-variable/plus-jakarta-sans";
 import "./globals.css";
+import { THEME_BOOT_SCRIPT } from "@/lib/themes";
 
 export const metadata: Metadata = {
   title: {
@@ -30,7 +31,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="id" className="h-full antialiased">
+    <html lang="id" className="h-full antialiased" suppressHydrationWarning>
+      <head>
+        {/* Tema terakhir dipasang sebelum halaman tampil, jadi warna tidak berkedip */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body className="min-h-full">{children}</body>
     </html>
   );

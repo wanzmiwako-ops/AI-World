@@ -7,7 +7,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-svh flex-col lg:flex-row">
-      <section className="relative flex shrink-0 flex-col overflow-hidden bg-ocean px-7 pt-[max(env(safe-area-inset-top),56px)] pb-20 text-white lg:w-1/2 lg:justify-between lg:px-16 lg:py-14">
+      <section className="relative flex shrink-0 flex-col overflow-hidden hero px-7 pt-[max(env(safe-area-inset-top),56px)] pb-20 text-white lg:w-1/2 lg:justify-between lg:px-16 lg:py-14">
         <span aria-hidden="true" className="absolute -top-16 -right-16 size-64 rounded-full bg-aqua/40" />
         <Bubbles />
         <div className="relative animate-rise">
@@ -32,8 +32,8 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           preserveAspectRatio="none"
           className="absolute -left-8 bottom-0 h-20 w-[calc(100%+64px)] lg:hidden"
         >
-          <path d="M0 34 C 80 4 150 4 225 30 S 370 64 450 26 V80 H0 Z" fill="#7FDBEA" opacity="0.55" style={{ animation: "sway 6s ease-in-out infinite" }} />
-          <path d="M0 56 C 90 26 160 34 230 56 S 370 82 450 52 V80 H0 Z" fill="#F2F8FC" />
+          <path d="M0 34 C 80 4 150 4 225 30 S 370 64 450 26 V80 H0 Z" fill="var(--color-aqua)" opacity="0.55" style={{ animation: "sway 6s ease-in-out infinite" }} />
+          <path d="M0 56 C 90 26 160 34 230 56 S 370 82 450 52 V80 H0 Z" fill="var(--color-sky)" />
         </svg>
       </section>
 

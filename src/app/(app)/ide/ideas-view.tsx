@@ -91,7 +91,7 @@ export function IdeasView() {
 
       <p className="text-sm text-muted">{list.length ? `${list.length} ide cocok buat kalian` : "Belum ada yang cocok. Coba longgarkan filter."}</p>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
         {list.map((idea) => (
           <article
             key={idea.id}

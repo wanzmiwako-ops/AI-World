@@ -187,7 +187,7 @@ export function ChatView({
   const lastMine = [...messages].reverse().find((m) => m.sender_id === me.id);
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden lg:h-[calc(100dvh-48px)] lg:pt-6">
+    <div data-fullscreen className="flex h-dvh flex-col overflow-hidden lg:h-[calc(100dvh-48px)] lg:pt-6">
       <header
         className="z-10 flex flex-col gap-3 rounded-b-[28px] bg-white px-4 pb-3.5 shadow-soft lg:mx-10 lg:rounded-[28px] lg:pt-4"
         style={{ paddingTop: "max(env(safe-area-inset-top), 14px)" }}

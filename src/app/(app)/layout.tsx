@@ -14,6 +14,8 @@ async function Live() {
       partner={viewer.partner ? { id: viewer.partner.id, name: viewer.partner.display_name, avatar: viewer.partner.avatar_url } : null}
       initialUnread={viewer.unread}
       pinEnabled={viewer.pinEnabled}
+      theme={viewer.couple.theme ?? "ocean"}
+      since={viewer.couple.anniversary ?? viewer.couple.created_at}
     />
   );
 }

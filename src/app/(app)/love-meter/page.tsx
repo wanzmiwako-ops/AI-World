@@ -24,13 +24,13 @@ async function LoveContent() {
       <section className="card flex animate-rise flex-col items-center gap-3 p-6">
         <div className="relative size-[210px]">
           <svg width="210" height="210" viewBox="0 0 210 210" role="img" aria-label={`Skor ${love.score} dari 100`}>
-            <circle cx="105" cy="105" r="88" fill="none" stroke="#E3F1FB" strokeWidth="18" />
+            <circle cx="105" cy="105" r="88" fill="none" stroke="var(--color-tint)" strokeWidth="18" />
             <circle
               cx="105"
               cy="105"
               r="88"
               fill="none"
-              stroke="#0A6EBD"
+              stroke="var(--color-ocean)"
               strokeWidth="18"
               strokeLinecap="round"
               strokeDasharray={dash}
@@ -61,7 +61,7 @@ async function LoveContent() {
                 <span className="font-medium">{p.name}</span>
                 <span className="font-bold">{p.value}</span>
               </div>
-              <div className="h-2.5 overflow-hidden rounded-full bg-[#EEF4F9]">
+              <div className="h-2.5 overflow-hidden rounded-full bg-tint">
                 <div
                   className={`h-2.5 rounded-full ${p.value < 60 ? "bg-[#F5B83D]" : "bg-ocean"}`}
                   style={{ width: `${p.value}%`, animation: `grow 1s cubic-bezier(.2,.8,.2,1) ${0.3 + i * 0.1}s both` }}
@@ -79,7 +79,7 @@ async function LoveContent() {
           {love.week.map((w, i) => (
             <div key={w.day} className="flex h-full flex-col items-center justify-end gap-1.5">
               <div
-                className={`w-full max-w-7 rounded-lg ${i === 6 ? "bg-ocean" : "bg-[#B5DAF2]"}`}
+                className={`w-full max-w-7 rounded-lg ${i === 6 ? "bg-ocean" : "bg-ocean-light/40"}`}
                 style={{ height: `${w.value ? 12 + (w.value / 5) * 68 : 6}px`, animation: `rise .5s ease ${i * 0.05}s both` }}
                 title={w.value ? `${w.value.toFixed(1)} dari 5` : "belum ada"}
               />

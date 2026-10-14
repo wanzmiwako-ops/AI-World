@@ -57,7 +57,7 @@ export function LockScreen({ name, avatar, next }: { name: string; avatar: strin
   const catMood: CatMood = mood !== "happy" ? mood : typed > 0 ? "joy" : "happy";
 
   return (
-    <div className="relative flex min-h-svh flex-col items-center overflow-hidden bg-ocean px-6 pt-[max(env(safe-area-inset-top),40px)] pb-[max(env(safe-area-inset-bottom),24px)] text-white">
+    <div className="relative flex min-h-svh flex-col items-center overflow-hidden hero px-6 pt-[max(env(safe-area-inset-top),40px)] pb-[max(env(safe-area-inset-bottom),24px)] text-white">
       <span aria-hidden="true" className="absolute -top-20 -right-20 size-72 rounded-full bg-aqua/30" />
       <Bubbles />
 

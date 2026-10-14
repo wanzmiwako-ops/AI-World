@@ -280,7 +280,7 @@ export function CheckinView({
 
       {phase === "active" && session?.together_at && (
         <div className="flex animate-rise flex-col gap-5">
-          <section className="relative flex flex-col items-center gap-2 overflow-hidden rounded-[30px] bg-ocean px-6 py-7 text-white">
+          <section className="relative flex flex-col items-center gap-2 overflow-hidden rounded-[30px] hero px-6 py-7">
             <Bubbles />
             <CatPair size={64} />
             <p className="relative flex items-center gap-2 text-sm font-bold">

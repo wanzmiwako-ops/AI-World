@@ -43,6 +43,17 @@ async function AccountContent({ searchParams }: { searchParams: PageProps<"/akun
       </div>
 
       <div className="flex flex-col gap-5">
+        {viewer.couple && (
+          <Link href="/tema" className="hero tap relative flex animate-rise items-center gap-4 overflow-hidden rounded-[26px] p-6">
+            <span aria-hidden="true" className="theme-art text-[48px] leading-none" style={{ animation: "bob 4s ease-in-out infinite" }} />
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-xs font-bold tracking-wide uppercase opacity-80">Tema dunia kita</span>
+              <span className="theme-name font-display text-xl font-semibold" />
+              <span className="text-[13px] opacity-90">Flora, Fauna, Pasar Malam, Misteri, Bioskop, Angkasa…</span>
+            </span>
+            <Icon name="next" />
+          </Link>
+        )}
         <section className="card flex animate-rise flex-col gap-4 p-6" aria-labelledby="pasangan">
           <div className="flex items-center justify-between">
             <h2 id="pasangan" className="font-display text-xl font-medium">Pasangan</h2>

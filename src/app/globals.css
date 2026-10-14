@@ -152,9 +152,12 @@
     color-scheme: light;
   }
 
+  html {
+    background: var(--color-sky);
+  }
+
   html,
   body {
-    background: var(--color-sky);
     color: var(--color-navy);
     /* Kokoh: tidak bisa tergeser ke kiri/kanan, tidak memantul di ujung layar */
     overflow-x: clip;
@@ -219,6 +222,148 @@
   textarea::placeholder {
     color: #8aa0b4;
   }
+}
+
+
+/* =====================================================================
+   Tema dunia. Semua warna aplikasi memakai token di atas, jadi cukup
+   menimpa token per tema. Hiasan (--deco-*) dipakai .deco & .theme-art.
+   ===================================================================== */
+:root {
+  --deco-a: "";
+  --deco-b: "";
+  --deco-c: "";
+  --art: "🐳";
+  --theme-name: "Samudra Biru";
+  --hero-from: var(--color-ocean);
+  --hero-to: var(--color-ocean-light);
+  --glow: var(--color-aqua);
+}
+:root[data-theme="flora"] {
+  --color-ocean: #1f8a50; --color-ocean-dark: #166b3d; --color-ocean-light: #37ad6c;
+  --color-aqua: #ffb3d1; --color-aqua-soft: #ffe8f1; --color-aqua-ink: #8a1f4e;
+  --color-sand: #ffe27a; --color-sand-soft: #fff4c4; --color-sand-ink: #5c4600;
+  --color-navy: #14332a; --color-ink-soft: #33564a; --color-muted: #587a6c;
+  --color-sky: #f3faf4; --color-tint: #e0f3e6; --color-line: #d3eadb;
+  --color-pink: #f2669b; --color-pink-soft: #ffe1ee; --color-blush: #ff9cc2;
+  --shadow-ocean: 0 8px 18px rgba(31, 138, 80, 0.3);
+  --deco-a: "🌸"; --deco-b: "🌼"; --deco-c: "🍃"; --theme-name: "Taman Bunga"; --art: "🌷";
+  --hero-from: #1f8a50; --hero-to: #5cc48a; --glow: #ffb3d1;
+}
+:root[data-theme="fauna"] {
+  --color-ocean: #b35a10; --color-ocean-dark: #8c450b; --color-ocean-light: #d97a2b;
+  --color-aqua: #b5e08c; --color-aqua-soft: #edf8e1; --color-aqua-ink: #3c5c12;
+  --color-sand: #ffd98a; --color-sand-soft: #fff0cf; --color-sand-ink: #6b4500;
+  --color-navy: #3a2412; --color-ink-soft: #5e4430; --color-muted: #7d6450;
+  --color-sky: #fbf6ee; --color-tint: #f5e7d5; --color-line: #eddcc6;
+  --color-pink: #f2706b; --color-pink-soft: #ffe4dc; --color-blush: #ffa596;
+  --shadow-ocean: 0 8px 18px rgba(179, 90, 16, 0.3);
+  --deco-a: "🐾"; --deco-b: "🦒"; --deco-c: "🌿"; --theme-name: "Hutan Safari"; --art: "🦁";
+  --hero-from: #a9520c; --hero-to: #d98a2e; --glow: #ffd98a;
+}
+:root[data-theme="hiburan"] {
+  --color-ocean: #b52f86; --color-ocean-dark: #8f2269; --color-ocean-light: #d84aa6;
+  --color-aqua: #8fe3ff; --color-aqua-soft: #e0f7ff; --color-aqua-ink: #0c5670;
+  --color-sand: #ffe066; --color-sand-soft: #fff5c0; --color-sand-ink: #5e4b00;
+  --color-navy: #3a0f2e; --color-ink-soft: #5e3352; --color-muted: #825878;
+  --color-sky: #fdf4fa; --color-tint: #f8e0ef; --color-line: #f0d4e6;
+  --color-pink: #ff5c8a; --color-pink-soft: #ffe0ea; --color-blush: #ff9fbe;
+  --shadow-ocean: 0 8px 18px rgba(181, 47, 134, 0.3);
+  --deco-a: "🎈"; --deco-b: "🍭"; --deco-c: "🎠"; --theme-name: "Pasar Malam"; --art: "🎡";
+  --hero-from: #b52f86; --hero-to: #f0743a; --glow: #ffe066;
+}
+:root[data-theme="misteri"] {
+  --color-ocean: #5b3fc4; --color-ocean-dark: #432d99; --color-ocean-light: #7b62e0;
+  --color-aqua: #c8b8ff; --color-aqua-soft: #eeeaff; --color-aqua-ink: #36248a;
+  --color-sand: #ffe9a6; --color-sand-soft: #fff5d6; --color-sand-ink: #5c4700;
+  --color-navy: #1c1440; --color-ink-soft: #3f3768; --color-muted: #645c8c;
+  --color-sky: #f1effa; --color-tint: #e5dffa; --color-line: #dcd5f2;
+  --color-pink: #ff6fa5; --color-pink-soft: #ffe3ef; --color-blush: #ff9fc4;
+  --shadow-ocean: 0 8px 18px rgba(91, 63, 196, 0.32);
+  --deco-a: "🌙"; --deco-b: "✨"; --deco-c: "🗝️"; --theme-name: "Misteri Malam"; --art: "🔮";
+  --hero-from: #1f1650; --hero-to: #5b3fc4; --glow: #c8b8ff;
+}
+:root[data-theme="movie"] {
+  --color-ocean: #c0283a; --color-ocean-dark: #971d2c; --color-ocean-light: #e04656;
+  --color-aqua: #ffd56b; --color-aqua-soft: #fff3cf; --color-aqua-ink: #6a4a00;
+  --color-sand: #ffe3a3; --color-sand-soft: #fff4dc; --color-sand-ink: #5f4300;
+  --color-navy: #2a1416; --color-ink-soft: #573a3c; --color-muted: #7c5f60;
+  --color-sky: #faf5f1; --color-tint: #f7e3df; --color-line: #eedad4;
+  --color-pink: #e8456b; --color-pink-soft: #ffe1e6; --color-blush: #ff98ad;
+  --shadow-ocean: 0 8px 18px rgba(192, 40, 58, 0.3);
+  --deco-a: "🍿"; --deco-b: "🎞️"; --deco-c: "⭐"; --theme-name: "Malam Bioskop"; --art: "🎬";
+  --hero-from: #2a1416; --hero-to: #c0283a; --glow: #ffd56b;
+}
+:root[data-theme="galaksi"] {
+  --color-ocean: #3b4fd8; --color-ocean-dark: #2c3bab; --color-ocean-light: #5d70f0;
+  --color-aqua: #8ef0e0; --color-aqua-soft: #dcfbf5; --color-aqua-ink: #0d5a50;
+  --color-sand: #ffe7a8; --color-sand-soft: #fff3d1; --color-sand-ink: #5c4300;
+  --color-navy: #121a45; --color-ink-soft: #343f73; --color-muted: #5a6494;
+  --color-sky: #eff1fb; --color-tint: #e0e5fb; --color-line: #d8ddf3;
+  --color-pink: #ff6f9c; --color-pink-soft: #ffe2ec; --color-blush: #ff9fbd;
+  --shadow-ocean: 0 8px 18px rgba(59, 79, 216, 0.32);
+  --deco-a: "⭐"; --deco-b: "🚀"; --deco-c: "☄️"; --theme-name: "Luar Angkasa"; --art: "🪐";
+  --hero-from: #0f1442; --hero-to: #3b4fd8; --glow: #8ef0e0;
+}
+
+html {
+  transition: background-color 0.4s ease;
+}
+
+/* Latar hero (kartu besar berwarna) mengikuti tema */
+@utility hero {
+  background: linear-gradient(135deg, var(--hero-from), var(--hero-to));
+  color: #fff;
+}
+
+/* Gambar besar khas tema (🐳 🌷 🦁 …) */
+.theme-art::before {
+  content: var(--art);
+}
+.theme-name::before {
+  content: var(--theme-name);
+}
+
+/* Hiasan melayang: gelembung untuk Samudra, emoji untuk tema lain */
+.deco {
+  position: absolute;
+  bottom: 0.5rem;
+  opacity: 0;
+  border-radius: 9999px;
+  border: 2px solid rgb(255 255 255 / 0.7);
+  line-height: 1;
+}
+:root[data-theme]:not([data-theme="ocean"]) .deco {
+  border: 0;
+  width: auto !important;
+  height: auto !important;
+  font-size: calc(var(--s) * 1.5);
+}
+.deco:nth-child(3n + 1)::before { content: var(--deco-a); }
+.deco:nth-child(3n + 2)::before { content: var(--deco-b); }
+.deco:nth-child(3n)::before { content: var(--deco-c); }
+
+/* Latar dekoratif PC: hiasan tema tersebar pelan */
+.backdrop-deco::before {
+  content: var(--deco-a);
+}
+.backdrop-deco:nth-child(3n + 2)::before { content: var(--deco-b); }
+.backdrop-deco:nth-child(3n)::before { content: var(--deco-c); }
+:root:not([data-theme]) .backdrop-deco::before,
+:root[data-theme="ocean"] .backdrop-deco::before {
+  content: "";
+}
+:root:not([data-theme]) .backdrop-deco,
+:root[data-theme="ocean"] .backdrop-deco {
+  width: var(--s);
+  height: var(--s);
+  border-radius: 9999px;
+  border: 3px solid color-mix(in oklab, var(--color-ocean) 22%, transparent);
+}
+
+/* Halaman layar penuh (chat): sembunyikan panel kanan */
+body:has([data-fullscreen]) .side-rail {
+  display: none;
 }
 
 /* Kartu, tombol, input — dipakai di seluruh aplikasi */
