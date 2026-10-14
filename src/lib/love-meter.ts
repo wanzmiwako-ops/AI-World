@@ -80,3 +80,12 @@ export function computeLoveMeter(raw: LoveStats | null, userId: string, now: Dat
 }
 
 export const MOOD_LABELS = ["", "Jauh", "Biasa", "Baik", "Dekat", "Lengket!"];
+
+/** Tingkatan Love Meter dengan emoji. */
+export function loveTier(score: number) {
+  if (score >= 85) return { emoji: "🔥", label: "Lengket banget!" };
+  if (score >= 70) return { emoji: "💗", label: "Hangat & manis" };
+  if (score >= 55) return { emoji: "🌤️", label: "Hangat-hangat kuku" };
+  if (score >= 40) return { emoji: "🥺", label: "Butuh perhatian" };
+  return { emoji: "🧊", label: "Butuh pelukan" };
+}
