@@ -3,11 +3,11 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { LiveRefresh } from "@/components/live/live-refresh";
 import { Cat } from "@/components/cat";
-import { LoveHeart, loveTier } from "@/components/love-heart";
+import { LoveHeart } from "@/components/love-heart";
 import { Bubbles, Page, PageHeader, PageSkeleton } from "@/components/ui";
 import { requireCouple } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
-import { computeLoveMeter, type LoveStats } from "@/lib/love-meter";
+import { computeLoveMeter, loveTier, type LoveStats } from "@/lib/love-meter";
 import { MoodPicker } from "./mood-picker";
 
 export const metadata: Metadata = { title: "Love Meter" };
