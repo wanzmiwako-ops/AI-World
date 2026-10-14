@@ -2,11 +2,14 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { deletePushSubscription, savePushSubscription, sendTestPush } from "@/app/(app)/akun/actions";
+import { removeNativeToken, saveNativeToken } from "@/app/(app)/live-actions";
+import { enableNativePush, isNativeApp, nativePushState } from "@/lib/native";
 import { Icon } from "@/components/icon";
 import { FormMessage } from "@/components/ui";
 import { haptic, isHapticOn, isSoundOn, play, setHapticOn, setSoundOn } from "@/lib/feel";
 
 const VAPID = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
+const APK_URL = process.env.NEXT_PUBLIC_ANDROID_APK_URL ?? "";
 
 function urlBase64ToUint8Array(base64: string) {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
@@ -59,6 +62,8 @@ function Toggle({ on, onChange, label, hint }: { on: boolean; onChange: (v: bool
 export function NotificationSettings() {
   const [support, setSupport] = useState<PushSupport | null>(null);
   const [subscribed, setSubscribed] = useState(false);
+  const [native, setNative] = useState(false);
+  const [android, setAndroid] = useState(false);
   const [sound, setSound] = useState(true);
   const [vibrate, setVibrate] = useState(true);
   const [status, setStatus] = useState<{ error?: string; message?: string }>();
@@ -69,7 +74,18 @@ export function NotificationSettings() {
     (async () => {
       // Nilai ini hanya ada di browser, jadi dibaca setelah tampil
       await Promise.resolve();
+      if (isNativeApp()) {
+        const st = await nativePushState();
+        if (!alive) return;
+        setNative(true);
+        setSupport("ok");
+        setSound(isSoundOn());
+        setVibrate(isHapticOn());
+        setSubscribed(st === "granted");
+        return;
+      }
       const s = detectPushSupport();
+      setAndroid(/Android/i.test(navigator.userAgent));
       let sub = false;
       if (s === "ok") {
         const reg = await navigator.serviceWorker.getRegistration();
@@ -89,6 +105,21 @@ export function NotificationSettings() {
   function togglePush(on: boolean) {
     setStatus(undefined);
     start(async () => {
+      if (native) {
+        if (on) {
+          const res = await enableNativePush(saveNativeToken);
+          if (res.error) return setStatus({ error: res.error });
+          setSubscribed(true);
+          setStatus({ message: "Notifikasi aplikasi aktif. Suara pesan: meong 🐱" });
+        } else {
+          const { FirebaseMessaging } = await import("@capacitor-firebase/messaging");
+          const { token } = await FirebaseMessaging.getToken().catch(() => ({ token: "" }));
+          if (token) await removeNativeToken(token);
+          await FirebaseMessaging.deleteToken().catch(() => {});
+          setSubscribed(false);
+        }
+        return;
+      }
       if (on) {
         const res = await enablePush();
         if (res.error) return setStatus({ error: res.error });
@@ -108,6 +139,16 @@ export function NotificationSettings() {
 
   return (
     <div className="flex flex-col gap-1">
+      {!native && android && APK_URL && (
+        <a href={APK_URL} className="mb-2 flex items-center gap-3 rounded-2xl bg-tint px-4 py-3 text-sm">
+          <span className="text-2xl" aria-hidden="true">🤖</span>
+          <span className="flex flex-1 flex-col">
+            <b>Pasang aplikasi Android A&amp;I WORLD</b>
+            <span className="text-muted">Notifikasi lebih andal dan bunyi meong saat ada pesan</span>
+          </span>
+          <Icon name="next" size={18} />
+        </a>
+      )}
       {support === "ios-install" && (
         <p className="mb-2 rounded-2xl bg-sand-soft px-4 py-3 text-sm text-sand-ink">
           <b>Pengguna iPhone:</b> buka di Safari → tombol Share → <b>Add to Home Screen</b>. Lalu buka A&amp;I WORLD dari ikon di Home Screen untuk mengaktifkan notifikasi.
@@ -121,7 +162,7 @@ export function NotificationSettings() {
       <Toggle
         on={subscribed}
         onChange={togglePush}
-        label="Notifikasi push"
+        label={native ? "Notifikasi aplikasi" : "Notifikasi push"}
         hint={pending ? "Sebentar…" : "Pesan, check-in, dan kangen dari pasangan, walau aplikasi ditutup"}
       />
       <Toggle
@@ -153,6 +194,9 @@ export function NotificationSettings() {
         >
           <Icon name="send" size={16} className="mr-1.5" /> Kirim notifikasi uji
         </button>
+      )}
+      {native && subscribed && (
+        <p className="mt-2 text-[13px] text-muted">Suara, getar, dan tampilan notifikasi bisa diatur di Pengaturan HP → Aplikasi → A&amp;I WORLD → Notifikasi.</p>
       )}
       <div className="mt-2">
         <FormMessage state={status?.error ? status : status?.message ? status : (status as { ok?: boolean })?.ok ? { message: "Terkirim! Cek notifikasi di HP-mu." } : undefined} />

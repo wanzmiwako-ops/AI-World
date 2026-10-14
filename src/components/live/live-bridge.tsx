@@ -3,7 +3,8 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { heartbeat } from "@/app/(app)/live-actions";
+import { heartbeat, markAway, saveNativeToken } from "@/app/(app)/live-actions";
+import { isNativeApp, nativeStatusBar, startNative } from "@/lib/native";
 import { channels, emitLive, pushToast, setLive, useLive, type Person } from "@/lib/live";
 import { haptic, play, primeAudio } from "@/lib/feel";
 import { createClient } from "@/lib/supabase/client";
@@ -60,6 +61,20 @@ export function LiveBridge({
     applyTheme(t);
   }, [theme]);
 
+  // Di dalam aplikasi Android: notifikasi Firebase, tombol kembali, warna bar status
+  const liveTheme = useLive((s) => s.theme);
+  useEffect(() => {
+    void nativeStatusBar(themeInfo(liveTheme).colors.bg);
+  }, [liveTheme]);
+  useEffect(() => {
+    void startNative({
+      navigate: (url) => router.push(url),
+      saveToken: (token, platform) => saveNativeToken(token, platform),
+      away: () => void markAway(),
+      back: () => router.back(),
+    });
+  }, [router]);
+
   // Suara di HP baru boleh berbunyi setelah layar disentuh sekali
   useEffect(() => {
     const prime = () => primeAudio();
@@ -69,7 +84,7 @@ export function LiveBridge({
 
   // Service worker untuk notifikasi push
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
+    if ("serviceWorker" in navigator && !isNativeApp()) {
       navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" }).catch(() => {});
     }
   }, []);
@@ -221,6 +236,8 @@ export function LiveBridge({
     function onVisibility() {
       if (document.visibilityState === "hidden") {
         hiddenAt = Date.now();
+        // langsung tandai "tidak aktif" supaya pesan berikutnya jadi notifikasi
+        void markAway().catch(() => {});
         if (timer) clearInterval(timer);
         timer = null;
         return;
