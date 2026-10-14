@@ -113,10 +113,7 @@ const HEART =
   '<svg viewBox="0 0 24 24" width="100%" height="100%" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9C.8 8.6 2.8 4.5 6.6 4.5c2.1 0 3.6 1.3 5.4 3 1.8-1.7 3.3-3 5.4-3 3.8 0 5.8 4.1 4.2 7.5C19.5 16.4 12 21 12 21z" fill="currentColor"/></svg>';
 const COLORS = ["#FF7A93", "#FF9FB2", "#7FDBEA", "#0A6EBD", "#F5B83D"];
 
-/** Hati-hati kecil beterbangan dari titik (x, y) di layar. */
-export function burstHearts(x: number, y: number, count = 10) {
-  if (typeof document === "undefined") return;
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+function heartLayer() {
   let layer = document.getElementById("heart-layer");
   if (!layer) {
     layer = document.createElement("div");
@@ -125,26 +122,46 @@ export function burstHearts(x: number, y: number, count = 10) {
     layer.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:90;overflow:hidden";
     document.body.appendChild(layer);
   }
+  return layer;
+}
+
+function spawnHeart(x: number, y: number, color: string, dx: number, dy: number, dur: number, size = 14 + Math.random() * 16) {
+  const el = document.createElement("span");
+  const rot = (Math.random() - 0.5) * 70;
+  el.innerHTML = HEART;
+  el.style.cssText = `position:absolute;left:${x - size / 2}px;top:${y - size / 2}px;width:${size}px;height:${size}px;color:${color};--dx:${dx}px;--dy:${dy}px;--rot:${rot}deg;animation:heart-fly ${dur}s cubic-bezier(.2,.7,.3,1) forwards`;
+  heartLayer().appendChild(el);
+  setTimeout(() => el.remove(), dur * 1000 + 200);
+}
+
+function reducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/** Hati-hati kecil beterbangan ke atas dari titik (x, y) di layar. */
+export function burstHearts(x: number, y: number, count = 10) {
+  if (typeof document === "undefined" || reducedMotion()) return;
   for (let i = 0; i < count; i++) {
-    const el = document.createElement("span");
-    const size = 14 + Math.random() * 16;
-    const dx = (Math.random() - 0.5) * 180;
-    const dy = -(90 + Math.random() * 140);
-    const rot = (Math.random() - 0.5) * 70;
-    el.innerHTML = HEART;
-    el.style.cssText = `position:absolute;left:${x - size / 2}px;top:${y - size / 2}px;width:${size}px;height:${size}px;color:${
-      COLORS[i % COLORS.length]
-    };--dx:${dx}px;--dy:${dy}px;--rot:${rot}deg;animation:heart-fly ${0.8 + Math.random() * 0.5}s cubic-bezier(.2,.7,.3,1) forwards`;
-    layer.appendChild(el);
-    setTimeout(() => el.remove(), 1500);
+    spawnHeart(x, y, COLORS[i % COLORS.length], (Math.random() - 0.5) * 180, -(90 + Math.random() * 140), 0.8 + Math.random() * 0.5);
   }
 }
 
-/** Hujan hati dari atas layar (untuk momen spesial). */
+/** Hujan hati yang jatuh dari atas layar (untuk momen spesial). */
 export function rainHearts(count = 24) {
-  if (typeof window === "undefined") return;
+  if (typeof document === "undefined" || reducedMotion()) return;
+  const h = window.innerHeight;
   for (let i = 0; i < count; i++) {
-    setTimeout(() => burstHearts(Math.random() * window.innerWidth, -10 + Math.random() * 40, 1), i * 60);
+    setTimeout(() => {
+      spawnHeart(
+        Math.random() * window.innerWidth,
+        -20,
+        COLORS[i % COLORS.length],
+        (Math.random() - 0.5) * 120,
+        h * (0.55 + Math.random() * 0.45),
+        1.6 + Math.random() * 1.2,
+        16 + Math.random() * 18,
+      );
+    }, i * 70);
   }
 }
 

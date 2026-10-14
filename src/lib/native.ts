@@ -116,13 +116,11 @@ export async function startNative(h: Handlers) {
   } catch {}
 }
 
-/** Warna bar status (jam, baterai) mengikuti latar tema: latar terang, ikon gelap. */
-export async function nativeStatusBar(color: string) {
+/** Ikon bar status gelap di latar terang (dan sebaliknya), mengikuti tema. */
+export async function nativeStatusBar(dark: boolean) {
   if (!isNativeApp()) return;
-  const { StatusBar, Style } = await import("@capacitor/status-bar");
   try {
-    await StatusBar.setOverlaysWebView({ overlay: false });
-    await StatusBar.setStyle({ style: Style.Light });
-    await StatusBar.setBackgroundColor({ color });
+    const { SystemBars, SystemBarsStyle } = await import("@capacitor/core");
+    await SystemBars.setStyle({ style: dark ? SystemBarsStyle.Dark : SystemBarsStyle.Light });
   } catch {}
 }

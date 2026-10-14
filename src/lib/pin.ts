@@ -29,6 +29,6 @@ export async function setUnlockToken(token: string | null) {
 
 /** Hanya izinkan kembali ke alamat di dalam aplikasi ini. */
 export function safeNext(next: string | null | undefined) {
-  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/kunci")) return "/";
+  if (!next || !next.startsWith("/") || next.startsWith("//") || next.includes("\\") || next.startsWith("/kunci")) return "/";
   return next;
 }

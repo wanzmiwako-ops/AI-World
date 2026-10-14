@@ -32,7 +32,7 @@ export function durationText(ms: number) {
 
 /** "2026-10-17T15:00" (input datetime-local, waktu Jakarta) → ISO UTC */
 export function jakartaLocalToIso(local: string) {
-  return new Date(`${local}:00+07:00`).toISOString();
+  return new Date(`${local.slice(0, 16)}:00+07:00`).toISOString();
 }
 
 /** ISO timestamp n jam yang lalu. */
