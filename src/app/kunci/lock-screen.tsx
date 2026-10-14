@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { resetPinWithPassword, signOutFromLock, unlockWithPin } from "./actions";
+import { attempt } from "@/lib/offline";
 import { Cat, type CatMood } from "@/components/cat";
 import { PinPad } from "@/components/pin-pad";
 import { Avatar, Bubbles } from "@/components/ui";
@@ -35,8 +36,8 @@ export function LockScreen({ name, avatar, next }: { name: string; avatar: strin
 
   function onComplete(pin: string) {
     start(async () => {
-      const res = await unlockWithPin(pin);
-      if (res.ok) {
+      const res = await attempt(() => unlockWithPin(pin));
+      if ("ok" in res && res.ok) {
         setMood("love");
         play("unlock");
         haptic([10, 40, 20]);
@@ -45,7 +46,7 @@ export function LockScreen({ name, avatar, next }: { name: string; avatar: strin
         return;
       }
       setMood("sad");
-      setMessage(res.error ?? "PIN salah.");
+      setMessage(("error" in res && res.error) || "PIN salah.");
       if ("lockedUntil" in res && res.lockedUntil) setLockedUntil(new Date(res.lockedUntil).getTime());
       setShake((s) => s + 1);
       setTimeout(() => setMood("happy"), 1400);
@@ -81,12 +82,12 @@ export function LockScreen({ name, avatar, next }: { name: string; avatar: strin
             onSubmit={(e) => {
               e.preventDefault();
               start(async () => {
-                const res = await resetPinWithPassword(password);
-                if (res.ok) {
+                const res = await attempt(() => resetPinWithPassword(password));
+                if ("ok" in res && res.ok) {
                   play("unlock");
                   router.replace(next);
                 } else {
-                  setMessage(res.error ?? "Gagal");
+                  setMessage(("error" in res && res.error) || "Gagal");
                   setShake((s) => s + 1);
                 }
               });

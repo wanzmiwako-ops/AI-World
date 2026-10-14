@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { sendNudge } from "@/app/(app)/live-actions";
+import { attempt } from "@/lib/offline";
 import { burstHearts, centerOf, haptic, play } from "@/lib/feel";
 import { getLive, useLiveEvent } from "@/lib/live";
 
@@ -83,8 +84,8 @@ export function NudgeBar({ partnerName, mine, theirs }: { partnerName: string; m
     setTimeout(() => setCooling(null), 2500);
     setTimeout(() => setSent((s) => (s === kind ? null : s)), 1600);
     start(async () => {
-      const res = await sendNudge(kind);
-      if (res.error) setCounts((c) => ({ ...c, mine: Math.max(0, c.mine - 1) }));
+      const res = await attempt(() => sendNudge(kind));
+      if ("error" in res && res.error) setCounts((c) => ({ ...c, mine: Math.max(0, c.mine - 1) }));
     });
   }
 

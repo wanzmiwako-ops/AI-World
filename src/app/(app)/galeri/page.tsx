@@ -1,3 +1,4 @@
+import { LiveRefresh } from "@/components/live/live-refresh";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Icon } from "@/components/icon";
@@ -25,7 +26,7 @@ async function GalleryContent() {
       .from("photos")
       .select("id, storage_path, thumb_path, caption, uploaded_by, created_at, checkin_session_id")
       .order("created_at", { ascending: false })
-      .limit(150),
+      .limit(300),
     supabase.from("meetings").select("id, title, place, starts_at").order("starts_at", { ascending: false }).limit(200),
     supabase.from("checkin_sessions").select("id, together_at, ended_at, place").not("together_at", "is", null).order("created_at", { ascending: false }).limit(200),
   ]);
@@ -105,6 +106,7 @@ export default function GaleriPage() {
           </Suspense>
         }
       />
+      <LiveRefresh kinds={["photo"]} />
       <Suspense fallback={<PageSkeleton />}>
         <GalleryContent />
       </Suspense>

@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { changePassword, removeAvatar, saveAvatar, updateCouple, updateProfile } from "./actions";
+import { attempt } from "@/lib/offline";
 import { Avatar, FormMessage } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { SubmitButton } from "@/components/submit-button";
@@ -36,7 +37,7 @@ export function AvatarEditor({ userId, name, url }: { userId: string; name: stri
         setPreview(url);
         return;
       }
-      setStatus(await saveAvatar(path));
+      setStatus(await attempt(() => saveAvatar(path)));
     });
   }
 
@@ -67,7 +68,7 @@ export function AvatarEditor({ userId, name, url }: { userId: string; name: stri
             onClick={() =>
               startTransition(async () => {
                 setPreview(null);
-                setStatus(await removeAvatar());
+                setStatus(await attempt(() => removeAvatar()));
               })
             }
           >

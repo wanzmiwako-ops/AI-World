@@ -22,7 +22,7 @@ export default function DaftarPage() {
         <form action={action} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <label htmlFor="name" className="label">Nama panggilan</label>
-            <input id="name" name="name" autoComplete="nickname" required placeholder="Misal: Andi" className="field" />
+            <input id="name" name="name" autoComplete="nickname" required maxLength={40} placeholder="Misal: Andi" className="field" />
           </div>
           <div className="flex flex-col gap-2">
             <label htmlFor="email" className="label">Email</label>

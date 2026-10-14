@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { sendNudge } from "@/app/(app)/live-actions";
+import { attempt } from "@/lib/offline";
 import { CatPair } from "@/components/cat";
 import { haptic, play, rainHearts } from "@/lib/feel";
 import { setLive, useLive } from "@/lib/live";
@@ -51,7 +52,7 @@ export function NudgeOverlay({ partnerName }: { partnerName: string }) {
               play("send");
               haptic(20);
               start(async () => {
-                await sendNudge("kangen");
+                await attempt(() => sendNudge("kangen"));
                 setTimeout(() => setLive({ nudge: null }), 600);
               });
             }}

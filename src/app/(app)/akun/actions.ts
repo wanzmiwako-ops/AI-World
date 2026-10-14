@@ -114,7 +114,8 @@ export async function savePin(pin: string, current: string | null, minutes: numb
   if (!/^[0-9]{4}$/.test(pin)) return { error: "PIN harus 4 angka." };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("set_pin", { p_pin: pin, p_current: current, p_lock_minutes: minutes });
-  if (error) return { error: error.message === "PIN lama salah" ? "PIN lama salah." : error.message };
+  if (error) return { error: error.message };
+  if (!data) return { error: "PIN lama salah (atau terlalu sering salah, tunggu sebentar)." };
   await setUnlockToken(data as string);
   refresh();
   return { ok: true };
@@ -123,8 +124,8 @@ export async function savePin(pin: string, current: string | null, minutes: numb
 export async function removePin(current: string) {
   await getViewer();
   const supabase = await createClient();
-  const { error } = await supabase.rpc("remove_pin", { p_current: current });
-  if (error) return { error: "PIN salah." };
+  const { data, error } = await supabase.rpc("remove_pin", { p_current: current });
+  if (error || data === false) return { error: "PIN salah (atau terlalu sering salah, tunggu sebentar)." };
   await setUnlockToken(null);
   refresh();
   return { ok: true };

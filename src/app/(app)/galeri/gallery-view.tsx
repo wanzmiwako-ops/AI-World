@@ -7,6 +7,7 @@ import { Icon } from "@/components/icon";
 import { FormMessage } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { uploadPhoto } from "@/lib/image";
+import { attempt, OFFLINE } from "@/lib/offline";
 
 export type GalleryPhoto = { id: string; url: string; fullPath: string; caption: string | null; uploader: string };
 export type Album = { key: string; title: string; meta: string; badge: string | null; photos: GalleryPhoto[] };
@@ -16,6 +17,13 @@ export function UploadButton({ coupleId }: { coupleId: string }) {
   const [pending, start] = useTransition();
   const [progress, setProgress] = useState<string>();
   const [error, setError] = useState<string>();
+
+  // Pesan gagal hilang sendiri setelah beberapa detik
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(() => setError(undefined), 6000);
+    return () => clearTimeout(t);
+  }, [error]);
 
   function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []).slice(0, 20);
@@ -32,7 +40,7 @@ export function UploadButton({ coupleId }: { coupleId: string }) {
       await Promise.all(
         Array.from({ length: Math.min(3, queue.length) }, async () => {
           for (let file = queue.shift(); file; file = queue.shift()) {
-            const res = await uploadPhoto(supabase, file, `${coupleId}/galeri`);
+            const res = await uploadPhoto(supabase, file, `${coupleId}/galeri`).catch(() => ({ error: OFFLINE }));
             if ("error" in res) setError(`Gagal mengunggah ${file.name}: ${res.error}`);
             else items.push({ path: res.path, thumbPath: res.thumbPath });
             done += 1;
@@ -41,8 +49,8 @@ export function UploadButton({ coupleId }: { coupleId: string }) {
         }),
       );
       if (items.length) {
-        const res = await addPhotos(items, null);
-        if (res.error) setError(res.error);
+        const res = await attempt(() => addPhotos(items, null));
+        if ("error" in res && res.error) setError(res.error);
       }
       setProgress(undefined);
     });
@@ -62,62 +70,117 @@ export function UploadButton({ coupleId }: { coupleId: string }) {
       </button>
       <input ref={input} type="file" accept="image/*" multiple className="sr-only" onChange={onPick} aria-label="Pilih foto" />
       {error && (
-        <div className="fixed inset-x-4 bottom-28 z-50 lg:left-auto lg:w-96">
+        <button type="button" onClick={() => setError(undefined)} className="fixed inset-x-4 bottom-28 z-50 text-left lg:left-auto lg:w-96">
           <FormMessage state={{ error }} />
-        </div>
+        </button>
       )}
     </>
   );
 }
 
-function Lightbox({ photo, onClose }: { photo: GalleryPhoto; onClose: () => void }) {
+function Lightbox({ list, index, onIndex, onClose }: { list: GalleryPhoto[]; index: number; onIndex: (i: number) => void; onClose: () => void }) {
+  const photo = list[index];
   const [pending, start] = useTransition();
-  const [full, setFull] = useState<string | null>(null);
+  const [full, setFull] = useState<{ path: string; url: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const touchX = useRef<number | null>(null);
+  const hasPrev = index > 0;
+  const hasNext = index < list.length - 1;
+
   useEffect(() => {
     let alive = true;
     createClient()
       .storage.from("gallery")
       .createSignedUrl(photo.fullPath, 3600)
       .then(({ data }) => {
-        if (alive && data?.signedUrl) setFull(data.signedUrl);
+        if (alive && data?.signedUrl) setFull({ path: photo.fullPath, url: data.signedUrl });
       });
     return () => {
       alive = false;
     };
   }, [photo.fullPath]);
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowLeft" && hasPrev) onIndex(index - 1);
+      else if (e.key === "ArrowRight" && hasNext) onIndex(index + 1);
+    };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose, onIndex, index, hasPrev, hasNext]);
+
+  const src = full && full.path === photo.fullPath ? full.url : photo.url;
+  const navBtn = "absolute top-1/2 hidden size-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 sm:flex";
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Foto" className="fixed inset-0 z-50 flex flex-col bg-navy/95 p-4 text-white" onClick={onClose}>
-      <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => {
-            if (confirm("Hapus foto ini dari galeri?")) start(async () => {
-              await deletePhoto(photo.id);
-              onClose();
-            });
-          }}
-          aria-label="Hapus foto"
-          className="flex size-11 items-center justify-center rounded-full bg-white/15"
-        >
-          <Icon name="trash" size={20} />
-        </button>
-        <button type="button" onClick={onClose} aria-label="Tutup" className="flex size-11 items-center justify-center rounded-full bg-white/15">
-          <Icon name="close" size={20} />
-        </button>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Foto"
+      className="fixed inset-0 z-50 flex flex-col bg-navy p-4 text-white"
+      style={{ paddingTop: "max(env(safe-area-inset-top), 16px)", paddingBottom: "max(env(safe-area-inset-bottom), 16px)" }}
+      onClick={onClose}
+      onTouchStart={(e) => {
+        touchX.current = e.touches[0].clientX;
+      }}
+      onTouchEnd={(e) => {
+        if (touchX.current === null) return;
+        const dx = e.changedTouches[0].clientX - touchX.current;
+        touchX.current = null;
+        if (dx > 50 && hasPrev) onIndex(index - 1);
+        else if (dx < -50 && hasNext) onIndex(index + 1);
+      }}
+    >
+      <div className="flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
+        <span className="text-sm font-bold opacity-80">
+          {index + 1} / {list.length}
+        </span>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              if (confirm("Hapus foto ini dari galeri?"))
+                start(async () => {
+                  const res = await attempt(() => deletePhoto(photo.id));
+                  if ("error" in res && res.error) setError(res.error);
+                  else onClose();
+                });
+            }}
+            aria-label="Hapus foto"
+            className="flex size-11 items-center justify-center rounded-full bg-white/15"
+          >
+            <Icon name="trash" size={20} />
+          </button>
+          <button type="button" onClick={onClose} aria-label="Tutup" className="flex size-11 items-center justify-center rounded-full bg-white/15">
+            <Icon name="close" size={20} />
+          </button>
+        </div>
       </div>
-      <div className="flex min-h-0 flex-1 items-center justify-center py-4">
+      <div className="relative flex min-h-0 flex-1 items-center justify-center py-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={full ?? photo.url} alt={photo.caption ?? "Foto kenangan"} className="max-h-full max-w-full rounded-2xl object-contain" />
+        <img key={photo.id} src={src} alt={photo.caption ?? "Foto kenangan"} className="max-h-full max-w-full rounded-2xl object-contain" style={{ animation: "fade-in .2s ease both" }} />
+        {hasPrev && (
+          <button type="button" aria-label="Foto sebelumnya" className={`${navBtn} left-0`} onClick={(e) => (e.stopPropagation(), onIndex(index - 1))}>
+            <Icon name="back" size={22} />
+          </button>
+        )}
+        {hasNext && (
+          <button type="button" aria-label="Foto berikutnya" className={`${navBtn} right-0`} onClick={(e) => (e.stopPropagation(), onIndex(index + 1))}>
+            <Icon name="next" size={22} />
+          </button>
+        )}
       </div>
+      {error && <p className="pb-2 text-center text-sm font-bold text-pink-soft">{error}</p>}
       <p className="text-center text-sm opacity-80">
         {photo.caption ? `${photo.caption} · ` : ""}diunggah {photo.uploader}
+        {list.length > 1 ? " · geser untuk foto lain" : ""}
       </p>
     </div>
   );
@@ -125,7 +188,7 @@ function Lightbox({ photo, onClose }: { photo: GalleryPhoto; onClose: () => void
 
 export function GalleryView({ albums, all }: { albums: Album[]; all: GalleryPhoto[] }) {
   const [view, setView] = useState<"album" | "all">("album");
-  const [open, setOpen] = useState<GalleryPhoto | null>(null);
+  const [open, setOpen] = useState<{ list: GalleryPhoto[]; index: number } | null>(null);
 
   if (!all.length) {
     return (
@@ -161,17 +224,22 @@ export function GalleryView({ albums, all }: { albums: Album[]; all: GalleryPhot
         <div className="grid gap-4 lg:grid-cols-2">
           {albums.map((a) => (
             <article key={a.key} className="card flex animate-rise flex-col gap-3 p-2.5 pb-4">
-              <div className="grid h-[182px] grid-cols-[2fr_1fr] grid-rows-2 gap-1.5">
+              <div className={`grid h-[182px] gap-1.5 ${a.photos.length === 1 ? "grid-cols-1" : a.photos.length === 2 ? "grid-cols-2" : "grid-cols-[2fr_1fr] grid-rows-2"}`}>
                 {a.photos.slice(0, 3).map((p, i) => (
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => setOpen(p)}
-                    className={`overflow-hidden rounded-[18px] bg-tint ${i === 0 ? "row-span-2" : ""} ${a.photos.length === 1 ? "col-span-2" : ""}`}
-                    aria-label="Lihat foto"
+                    onClick={() => setOpen({ list: a.photos, index: i })}
+                    className={`relative overflow-hidden rounded-[18px] bg-tint ${i === 0 && a.photos.length > 2 ? "row-span-2" : ""}`}
+                    aria-label={i === 2 && a.photos.length > 3 ? `Lihat ${a.photos.length} foto` : "Lihat foto"}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={p.url} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
+                    {i === 2 && a.photos.length > 3 && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-navy/45 font-display text-2xl font-semibold text-white">
+                        +{a.photos.length - 3}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -187,8 +255,8 @@ export function GalleryView({ albums, all }: { albums: Album[]; all: GalleryPhot
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-1.5 lg:grid-cols-5">
-          {all.map((p) => (
-            <button key={p.id} type="button" onClick={() => setOpen(p)} className="aspect-square overflow-hidden rounded-xl bg-tint" aria-label="Lihat foto">
+          {all.map((p, i) => (
+            <button key={p.id} type="button" onClick={() => setOpen({ list: all, index: i })} className="aspect-square overflow-hidden rounded-xl bg-tint" aria-label="Lihat foto">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={p.url} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
             </button>
@@ -196,7 +264,14 @@ export function GalleryView({ albums, all }: { albums: Album[]; all: GalleryPhot
         </div>
       )}
 
-      {open && <Lightbox photo={open} onClose={() => setOpen(null)} />}
+      {open && open.list[open.index] && (
+        <Lightbox
+          list={open.list}
+          index={open.index}
+          onIndex={(index) => setOpen((o) => (o ? { ...o, index } : o))}
+          onClose={() => setOpen(null)}
+        />
+      )}
     </>
   );
 }

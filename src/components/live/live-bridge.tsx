@@ -49,6 +49,12 @@ export function LiveBridge({
   const pathRef = useRef(pathname);
   const unread = useLive((s) => s.unread);
   const photoBatch = useRef<{ count: number; timer: ReturnType<typeof setTimeout> | null }>({ count: 0, timer: null });
+  // Nama & foto pasangan disimpan di ref: kalau berubah, koneksi realtime tidak perlu disambung ulang
+  const partnerId = partner?.id ?? null;
+  const partnerRef = useRef(partner);
+  useEffect(() => {
+    partnerRef.current = partner;
+  });
 
   useEffect(() => {
     setLive({ ready: true, coupleId, me, partner, unread: initialUnread, since });
@@ -61,16 +67,15 @@ export function LiveBridge({
     applyTheme(t);
   }, [theme]);
 
-  // Di dalam aplikasi Android: notifikasi Firebase, tombol kembali, warna bar status
-  const liveTheme = useLive((s) => s.theme);
+  // Di dalam aplikasi Android: notifikasi Firebase, tombol kembali, ikon bar status
   useEffect(() => {
-    void nativeStatusBar(themeInfo(liveTheme).colors.bg);
-  }, [liveTheme]);
+    void nativeStatusBar(false);
+  }, []);
   useEffect(() => {
     void startNative({
       navigate: (url) => router.push(url),
       saveToken: (token, platform) => saveNativeToken(token, platform),
-      away: () => void markAway(),
+      away: () => void markAway().catch(() => {}),
       back: () => router.back(),
     });
   }, [router]);
@@ -109,10 +114,9 @@ export function LiveBridge({
     let cancelled = false;
     let chat: RealtimeChannel | null = null;
     let events: RealtimeChannel | null = null;
-    const partnerName = partner?.name ?? "Pasangan";
-
+    const pname = () => partnerRef.current?.name ?? "Pasangan";
     function toastFromPartner(title: string, body: string | undefined, href: string, tone: "ocean" | "pink" | "sand" | "aqua" = "ocean") {
-      pushToast({ title, body, href, tone, avatar: partner?.avatar ?? null, cat: "boba" });
+      pushToast({ title, body, href, tone, avatar: partnerRef.current?.avatar ?? null, cat: "boba" });
       play("ding");
       haptic([30, 40, 30]);
     }
@@ -128,7 +132,7 @@ export function LiveBridge({
           if (payload.sender_id === me.id) return;
           if (pathRef.current.startsWith("/chat") && document.visibilityState === "visible") return;
           setLive((s) => ({ unread: s.unread + 1 }));
-          toastFromPartner(partnerName, preview(String(payload.kind), payload.body), "/chat");
+          toastFromPartner(pname(), preview(String(payload.kind), payload.body), "/chat");
         })
         .on("broadcast", { event: "message_update" }, ({ payload }: { payload: Record<string, unknown> }) => emitLive("message_update", payload))
         .on("broadcast", { event: "typing" }, ({ payload }: { payload: Record<string, unknown> }) => emitLive("typing", payload))
@@ -139,7 +143,7 @@ export function LiveBridge({
         .on("broadcast", { event: "checkin" }, ({ payload }: { payload: Record<string, unknown> }) => {
           emitLive("checkin", payload);
           if (payload.table === "checkin_participants" && payload.by && payload.by !== me.id && !pathRef.current.startsWith("/ketemu")) {
-            toastFromPartner(`${partnerName} sudah check-in!`, "Lagi bareng? Ketuk untuk check-in juga.", "/ketemu", "aqua");
+            toastFromPartner(`${pname()} sudah check-in!`, "Lagi bareng? Ketuk untuk check-in juga.", "/ketemu", "aqua");
           }
         })
         .on("broadcast", { event: "activity" }, ({ payload }: { payload: Record<string, unknown> }) => {
@@ -151,20 +155,23 @@ export function LiveBridge({
           if (payload.by === me.id) return;
           switch (payload.kind) {
             case "meeting":
-              toastFromPartner(`${partnerName} menambahkan jadwal`, String(payload.title ?? ""), "/kalender", "aqua");
+              toastFromPartner(`${pname()} menambahkan jadwal`, String(payload.title ?? ""), "/kalender", "aqua");
               break;
             case "issue":
-              toastFromPartner(`${partnerName} ingin ngobrol`, String(payload.title ?? ""), "/ruang-bicara", "sand");
+              toastFromPartner(`${pname()} ingin ngobrol`, String(payload.title ?? ""), "/ruang-bicara", "sand");
+              break;
+            case "issue_resolved":
+              toastFromPartner("Kalian sudah sepakat ✨", String(payload.agreement ?? payload.title ?? ""), "/ruang-bicara", "aqua");
               break;
             case "issue_response":
-              toastFromPartner(`${partnerName} sudah menulis sisi ceritanya`, "Yuk sepakati langkah bareng", "/ruang-bicara", "sand");
+              toastFromPartner(`${pname()} sudah menulis sisi ceritanya`, "Yuk sepakati langkah bareng", "/ruang-bicara", "sand");
               break;
             case "mood":
-              toastFromPartner(`${partnerName} lagi merasa ${MOOD[Number(payload.mood)] ?? "…"}`, "Lihat Love Meter", "/love-meter", "pink");
+              toastFromPartner(`${pname()} lagi merasa ${MOOD[Number(payload.mood)] ?? "…"}`, "Lihat Love Meter", "/love-meter", "pink");
               break;
             case "theme": {
               const t = themeInfo(String(payload.theme));
-              toastFromPartner(`${partnerName} mengubah dunia kalian`, `Selamat datang di ${t.name} ${t.art}`, "/tema", "pink");
+              toastFromPartner(`${pname()} mengubah dunia kalian`, `Selamat datang di ${t.name} ${t.art}`, "/tema", "pink");
               break;
             }
             case "photo": {
@@ -172,7 +179,7 @@ export function LiveBridge({
               b.count += 1;
               if (b.timer) clearTimeout(b.timer);
               b.timer = setTimeout(() => {
-                toastFromPartner(`${partnerName} menambahkan ${b.count} foto`, "Lihat di Galeri", "/galeri", "aqua");
+                toastFromPartner(`${pname()} menambahkan ${b.count} foto`, "Lihat di Galeri", "/galeri", "aqua");
                 b.count = 0;
               }, 1500);
               break;
@@ -186,9 +193,9 @@ export function LiveBridge({
           const onIt = pathRef.current === href;
           const name = gameName(String(payload.kind));
           if (payload.op === "insert" && !onIt) {
-            toastFromPartner(`${partnerName} ngajak main ${name}!`, "Ketuk untuk ikut main", href, "pink");
+            toastFromPartner(`${pname()} ngajak main ${name}!`, "Ketuk untuk ikut main", href, "pink");
           } else if (payload.op === "update" && !onIt && payload.status === "playing" && payload.turn === me.id) {
-            toastFromPartner(`Giliranmu di ${name}`, `${partnerName} sudah jalan`, href, "aqua");
+            toastFromPartner(`Giliranmu di ${name}`, `${pname()} sudah jalan`, href, "aqua");
           }
         })
         .on("broadcast", { event: "game_cursor" }, ({ payload }: { payload: Record<string, unknown> }) => emitLive("game_cursor", payload))
@@ -198,7 +205,7 @@ export function LiveBridge({
         })
         .on("presence", { event: "sync" }, () => {
           const state = events!.presenceState() as Record<string, { page?: string }[]>;
-          const p = partner ? state[partner.id] : undefined;
+          const p = partnerId ? state[partnerId] : undefined;
           setLive({ partnerOnline: Boolean(p?.length), partnerPage: p?.[p.length - 1]?.page ?? null });
         })
         .subscribe(async (status: string) => {
@@ -216,7 +223,7 @@ export function LiveBridge({
       if (chat) void supabase.removeChannel(chat);
       if (events) void supabase.removeChannel(events);
     };
-  }, [coupleId, me.id, partner]);
+  }, [coupleId, me.id, partnerId]);
 
   // Denyut: tandai online, perpanjang kunci PIN, dan kunci lagi kalau sudah lewat batas
   useEffect(() => {

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { saveTheme } from "./actions";
+import { attempt } from "@/lib/offline";
 import { CatPair } from "@/components/cat";
 import { Icon } from "@/components/icon";
 import { burstHearts, centerOf, haptic, play } from "@/lib/feel";
@@ -27,8 +28,8 @@ export function ThemePicker({ initial, partnerName }: { initial: string; partner
     play("chime");
     haptic([10, 30, 10]);
     start(async () => {
-      const res = await saveTheme(id);
-      if (res.error) {
+      const res = await attempt(() => saveTheme(id));
+      if ("error" in res && res.error) {
         setError(res.error);
         setPicked(prev);
         if (isThemeId(prev)) {

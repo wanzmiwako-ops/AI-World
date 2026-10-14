@@ -1,3 +1,4 @@
+import { LiveRefresh } from "@/components/live/live-refresh";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Cat } from "@/components/cat";
@@ -79,6 +80,7 @@ export default function RuangBicaraPage() {
   return (
     <Page>
       <PageHeader title="Ruang Bicara" subtitle="Ngobrol pelan-pelan, selesaikan bareng." back="/" />
+      <LiveRefresh kinds={["issue", "issue_response", "issue_resolved"]} />
       <Suspense fallback={<PageSkeleton />}>
         <IssuesContent />
       </Suspense>

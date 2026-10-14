@@ -4,6 +4,8 @@ import { useEffect, useState, useTransition } from "react";
 import { deletePushSubscription, savePushSubscription, sendTestPush } from "@/app/(app)/akun/actions";
 import { removeNativeToken, saveNativeToken } from "@/app/(app)/live-actions";
 import { enableNativePush, isNativeApp, nativePushState } from "@/lib/native";
+import { attempt } from "@/lib/offline";
+import { unstable_rethrow } from "next/navigation";
 import { Icon } from "@/components/icon";
 import { FormMessage } from "@/components/ui";
 import { haptic, isHapticOn, isSoundOn, play, setHapticOn, setSoundOn } from "@/lib/feel";
@@ -105,6 +107,7 @@ export function NotificationSettings() {
   function togglePush(on: boolean) {
     setStatus(undefined);
     start(async () => {
+      try {
       if (native) {
         if (on) {
           const res = await enableNativePush(saveNativeToken);
@@ -133,6 +136,10 @@ export function NotificationSettings() {
           await sub.unsubscribe();
         }
         setSubscribed(false);
+      }
+      } catch (e) {
+        unstable_rethrow(e);
+        setStatus({ error: "Gagal mengubah notifikasi. Cek internet & izin notifikasi, lalu coba lagi." });
       }
     });
   }
@@ -189,7 +196,7 @@ export function NotificationSettings() {
         <button
           type="button"
           disabled={pending}
-          onClick={() => start(async () => setStatus(await sendTestPush()))}
+          onClick={() => start(async () => setStatus(await attempt(() => sendTestPush())))}
           className="chip mt-2 self-start"
         >
           <Icon name="send" size={16} className="mr-1.5" /> Kirim notifikasi uji

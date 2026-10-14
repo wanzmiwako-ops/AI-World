@@ -2,6 +2,8 @@
 
 import { useOptimistic, useTransition } from "react";
 import { setMood } from "./actions";
+import { attempt } from "@/lib/offline";
+import { play } from "@/lib/feel";
 import { Cat, type CatMood } from "@/components/cat";
 import { MOOD_LABELS_CLIENT, SAYINGS } from "./labels";
 
@@ -41,7 +43,9 @@ export function MoodPicker({ mine, partner, partnerName }: { mine: number | null
             onClick={() =>
               startTransition(async () => {
                 setOptimistic(n);
-                await setMood(n);
+                const res = await attempt(() => setMood(n));
+                if ("error" in res && res.error) play("error");
+                else play("pop");
               })
             }
             className="chip"

@@ -45,7 +45,7 @@ export function IssueForm({ partnerName }: { partnerName: string }) {
       </div>
       <div className="flex flex-col gap-2">
         <label htmlFor="feeling" className="label">Aku merasa…</label>
-        <textarea id="feeling" name="feeling" rows={3} placeholder="Pakai “aku merasa”, bukan “kamu selalu”." className="field min-h-24 resize-none py-3" />
+        <textarea id="feeling" name="feeling" rows={3} maxLength={4000} placeholder="Pakai “aku merasa”, bukan “kamu selalu”." className="field min-h-24 resize-none py-3" />
       </div>
       <FormMessage state={state} />
       <SubmitButton pendingText="Mengirim…">Kirim ke {partnerName}</SubmitButton>
@@ -65,7 +65,7 @@ function RespondForm({ issueId }: { issueId: string }) {
     <form action={action} className="flex flex-col gap-3 rounded-[18px] bg-sky p-4">
       <input type="hidden" name="issue_id" value={issueId} />
       <label htmlFor={`r-${issueId}`} className="label">Dari sisiku, aku merasa…</label>
-      <textarea id={`r-${issueId}`} name="feeling" rows={3} required className="field min-h-20 resize-none py-3" />
+      <textarea id={`r-${issueId}`} name="feeling" rows={3} required maxLength={4000} className="field min-h-20 resize-none py-3" />
       <FormMessage state={state} />
       <SubmitButton pendingText="Mengirim…">Kirim sisi ceritaku</SubmitButton>
     </form>
@@ -78,7 +78,7 @@ function ResolveForm({ issueId }: { issueId: string }) {
     <form action={action} className="flex flex-col gap-3 rounded-[18px] bg-sky p-4">
       <input type="hidden" name="issue_id" value={issueId} />
       <label htmlFor={`a-${issueId}`} className="label">Kesepakatan kita</label>
-      <textarea id={`a-${issueId}`} name="agreement" rows={2} required placeholder="Satu langkah kecil yang kita sepakati…" className="field min-h-20 resize-none py-3" />
+      <textarea id={`a-${issueId}`} name="agreement" rows={2} required maxLength={2000} placeholder="Satu langkah kecil yang kita sepakati…" className="field min-h-20 resize-none py-3" />
       <FormMessage state={state} />
       <SubmitButton pendingText="Menyimpan…" className="btn btn-dark w-full">Tandai selesai</SubmitButton>
     </form>

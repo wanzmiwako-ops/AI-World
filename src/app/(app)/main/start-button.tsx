@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type ReactNode } from "react";
 import { startGame } from "./actions";
+import { attempt } from "@/lib/offline";
 import type { GameKind } from "@/lib/games/catalog";
 import { haptic, play } from "@/lib/feel";
 
@@ -33,8 +34,8 @@ export function StartGameButton({
           haptic(12);
           setError(null);
           start(async () => {
-            const res = await startGame(kind);
-            if (res?.error) setError(res.error);
+            const res = await attempt(() => startGame(kind));
+            if (res && "error" in res && res.error) setError(res.error);
           });
         }}
       >

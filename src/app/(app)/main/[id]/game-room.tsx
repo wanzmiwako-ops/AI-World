@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { deleteGame } from "../actions";
 import { StartGameButton } from "../start-button";
@@ -12,6 +12,7 @@ import { gameInfo, TONE, type GameRow } from "@/lib/games/catalog";
 import { haptic, play, rainHearts } from "@/lib/feel";
 import { useLive, useLiveEvent, type Person } from "@/lib/live";
 import { createClient } from "@/lib/supabase/client";
+import { OFFLINE } from "@/lib/offline";
 import type { XoState } from "@/lib/games/xo";
 import type { UnoState } from "@/lib/games/uno";
 import type { TtsState } from "@/lib/games/tts";
@@ -39,6 +40,12 @@ const COLS = "id, kind, state, turn, status, winner, version, created_by, update
 export function GameRoom({ initial, me, partner }: { initial: GameRow; me: Person; partner: Person }) {
   const [game, setGame] = useState<GameRow>(initial);
   const gameRef = useRef(game);
+  // Data terakhir dari server + isian yang belum dikonfirmasi server (supaya huruf TTS tidak berkedip)
+  const serverRef = useRef<GameRow>(initial);
+  const pending = useRef<{ id: number; key: string; patch: Record<string, unknown> }[]>([]);
+  const pendingId = useRef(0);
+  const [stopped, setStopped] = useState(false);
+  const router = useRouter();
   const pathname = usePathname();
   const partnerPage = useLive((s) => s.partnerPage);
   const partnerOnline = useLive((s) => s.partnerOnline);
@@ -46,15 +53,36 @@ export function GameRoom({ initial, me, partner }: { initial: GameRow; me: Perso
   const info = gameInfo(game.kind);
   const [, startDelete] = useTransition();
 
-  const accept = useCallback((next: GameRow) => {
-    if (next.version < gameRef.current.version) return;
-    gameRef.current = next;
-    setGame(next);
+  const show = useCallback((base: GameRow) => {
+    let state = base.state;
+    for (const p of pending.current) {
+      state = { ...state, [p.key]: { ...((state[p.key] as Record<string, unknown>) ?? {}), ...p.patch } };
+    }
+    const shown = state === base.state ? base : { ...base, state };
+    gameRef.current = shown;
+    setGame(shown);
   }, []);
+
+  const accept = useCallback(
+    (next: GameRow) => {
+      if (next.version < serverRef.current.version) return;
+      serverRef.current = next;
+      show(next);
+    },
+    [show],
+  );
 
   // Perubahan dari pasangan (realtime)
   useLiveEvent("game", (p) => {
     if (p.id !== initial.id) return;
+    if (p.op === "delete") {
+      if (p.by !== me.id) {
+        setStopped(true);
+        play("error");
+        setTimeout(() => router.push("/main"), 2200);
+      }
+      return;
+    }
     const next = p as unknown as GameRow;
     const wasDone = gameRef.current.status === "done";
     accept(next);
@@ -98,24 +126,28 @@ export function GameRoom({ initial, me, partner }: { initial: GameRow; me: Perso
       gameRef.current = optimistic;
       setGame(optimistic);
       if (opts?.done) celebrate(optimistic);
-      const { data, error } = await createClient().rpc("game_move", {
+      const { data, error } = await createClient()
+        .rpc("game_move", {
         p_id: prev.id,
         p_version: prev.version,
         p_state: state,
         p_turn: opts?.done ? null : turn,
         p_status: opts?.done ? "done" : "playing",
         p_winner: opts?.winner ?? null,
-      });
+        })
+        .then(
+          (r) => r,
+          () => ({ data: null, error: new Error("offline") }),
+        );
       const res = data as { ok: boolean; game: GameRow } | null;
       if (error || !res) {
-        gameRef.current = prev;
-        setGame(prev);
+        show(serverRef.current);
         play("error");
         return false;
       }
       if (!res.ok) {
-        gameRef.current = res.game;
-        setGame(res.game);
+        serverRef.current = res.game;
+        show(res.game);
         play("error");
         return false;
       }
@@ -128,18 +160,31 @@ export function GameRoom({ initial, me, partner }: { initial: GameRow; me: Perso
 
   const merge = useCallback<GameCtx["merge"]>(
     (key, patch) => {
-      const prev = gameRef.current;
-      const cur = (prev.state[key] as Record<string, unknown>) ?? {};
-      const optimistic: GameRow = { ...prev, state: { ...prev.state, [key]: { ...cur, ...patch } } };
-      gameRef.current = optimistic;
-      setGame(optimistic);
+      const entry = { id: ++pendingId.current, key, patch };
+      pending.current.push(entry);
+      show(serverRef.current);
+      const done = () => {
+        pending.current = pending.current.filter((p) => p.id !== entry.id);
+      };
       void createClient()
-        .rpc("game_merge", { p_id: prev.id, p_key: key, p_patch: patch })
-        .then(({ data }) => {
-          if (data) accept(data as GameRow);
-        });
+        .rpc("game_merge", { p_id: serverRef.current.id, p_key: key, p_patch: patch })
+        .then(
+          ({ data, error }) => {
+            done();
+            if (data) accept(data as GameRow);
+            else {
+              if (error) play("error");
+              show(serverRef.current);
+            }
+          },
+          () => {
+            done();
+            play("error");
+            show(serverRef.current);
+          },
+        );
     },
-    [accept],
+    [accept, show],
   );
 
   const finish = useCallback<GameCtx["finish"]>(
@@ -152,9 +197,12 @@ export function GameRoom({ initial, me, partner }: { initial: GameRow; me: Perso
       celebrate(optimistic);
       void createClient()
         .rpc("game_finish", { p_id: prev.id, p_winner: winner, p_patch: patch ?? null })
-        .then(({ data }) => {
-          if (data) accept(data as GameRow);
-        });
+        .then(
+          ({ data }) => {
+            if (data) accept(data as GameRow);
+          },
+          () => undefined,
+        );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [accept],
@@ -184,6 +232,12 @@ export function GameRoom({ initial, me, partner }: { initial: GameRow; me: Perso
         </span>
       </AppBar>
 
+      {stopped && (
+        <p role="alert" className="animate-rise rounded-[20px] bg-pink-soft px-4 py-3 text-center text-sm font-bold text-[#9b1c3a]">
+          {partner.name} menghentikan game ini. Kembali ke Main Bareng…
+        </p>
+      )}
+
       {done && (
         <section className="hero relative flex animate-rise flex-col items-center gap-3 overflow-hidden rounded-[28px] p-5 text-center sm:flex-row sm:text-left">
           <CatPair size={64} motion="hop" moods={game.winner && game.winner !== me.id ? ["sad", "joy"] : ["joy", "love"]} />
@@ -211,7 +265,7 @@ export function GameRoom({ initial, me, partner }: { initial: GameRow; me: Perso
             type="button"
             className="btn btn-ghost text-muted"
             onClick={() => {
-              if (confirm("Hentikan game ini?")) startDelete(() => deleteGame(game.id));
+              if (confirm("Hentikan game ini?")) startDelete(() => deleteGame(game.id).catch(() => alert(OFFLINE)));
             }}
           >
             Hentikan game

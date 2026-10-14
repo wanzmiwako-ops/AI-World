@@ -10,6 +10,7 @@ import { broadcast, useLive, useLiveEvent } from "@/lib/live";
 import { burstHearts, centerOf, haptic, play } from "@/lib/feel";
 import { createClient } from "@/lib/supabase/client";
 import { randomId, uploadPhoto } from "@/lib/image";
+import { attempt, OFFLINE } from "@/lib/offline";
 
 type Person = { id: string; name: string; avatar: string | null };
 
@@ -403,10 +404,14 @@ export function ChatView({
       url: localUrl,
     });
     startTransition(async () => {
-      const res = await sendMessage({ kind, body, mediaPath, thumbPath, replyTo: replying?.id ?? null });
-      if (res.error || !res.message) {
+      const res = await attempt(() => sendMessage({ kind, body, mediaPath, thumbPath, replyTo: replying?.id ?? null }));
+      if ("error" in res && res.error || !("message" in res) || !res.message) {
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
-        setError(res.error ?? "Pesan gagal terkirim.");
+        setError(("error" in res && res.error) || "Pesan gagal terkirim.");
+        play("error");
+        // teks yang gagal dikembalikan ke kolom ketik supaya tidak hilang
+        if (kind === "text" && body) setDraft((d) => d || body);
+        if (replying) setReplyTo((r) => r ?? replying);
       } else {
         upsert(res.message, tempId);
       }
@@ -426,7 +431,7 @@ export function ChatView({
     e.target.value = "";
     if (!file) return;
     startTransition(async () => {
-      const up = await uploadPhoto(createClient(), file, `${coupleId}/chat`);
+      const up = await uploadPhoto(createClient(), file, `${coupleId}/chat`).catch(() => ({ error: OFFLINE }));
       if ("error" in up) return setError(`Foto gagal diunggah: ${up.error}`);
       send("photo", null, up.path, up.localUrl, up.thumbPath);
     });
@@ -437,7 +442,9 @@ export function ChatView({
     if (!first) return;
     stickToBottom.current = false;
     startTransition(async () => {
-      const list = await loadOlder(first.created_at);
+      const res = await attempt(() => loadOlder(first.created_at));
+      if (!Array.isArray(res)) return setError(res.error);
+      const list = res;
       if (list.length < 40) setHasMore(false);
       setMessages((prev) => [...list.filter((m) => !prev.some((p) => p.id === m.id)), ...prev]);
     });

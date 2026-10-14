@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { lockNow, removePin, saveLockMinutes, savePin } from "./actions";
+import { attempt } from "@/lib/offline";
 import { Cat } from "@/components/cat";
 import { Icon } from "@/components/icon";
 import { PinPad } from "@/components/pin-pad";
@@ -43,8 +44,8 @@ export function SecuritySettings({ pinEnabled, lockMinutes }: { pinEnabled: bool
     if (step === "current") {
       if (flow === "remove") {
         start(async () => {
-          const res = await removePin(pin);
-          if (res.error) return fail(res.error);
+          const res = await attempt(() => removePin(pin));
+          if ("error" in res && res.error) return fail(res.error);
           setFlow(null);
           setDone("PIN dimatikan.");
         });
@@ -67,8 +68,8 @@ export function SecuritySettings({ pinEnabled, lockMinutes }: { pinEnabled: bool
       return fail("PIN tidak sama. Ulangi dari awal, ya.");
     }
     start(async () => {
-      const res = await savePin(pin, current, minutes);
-      if (res.error) {
+      const res = await attempt(() => savePin(pin, current, minutes));
+      if ("error" in res && res.error) {
         setStep(flow === "change" ? "current" : "new");
         return fail(res.error);
       }
@@ -114,7 +115,7 @@ export function SecuritySettings({ pinEnabled, lockMinutes }: { pinEnabled: bool
                   className="chip flex-1 justify-center"
                   onClick={() => {
                     setMinutes(m);
-                    start(() => saveLockMinutes(m).then(() => undefined));
+                    start(() => saveLockMinutes(m).then(() => undefined, () => undefined));
                   }}
                 >
                   {m} menit

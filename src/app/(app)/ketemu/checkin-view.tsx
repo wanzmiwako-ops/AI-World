@@ -11,6 +11,7 @@ import { useLiveEvent } from "@/lib/live";
 import { burstHearts, haptic, play, rainHearts } from "@/lib/feel";
 import { createClient } from "@/lib/supabase/client";
 import { uploadPhoto } from "@/lib/image";
+import { attempt, OFFLINE } from "@/lib/offline";
 
 type Person = { id: string; name: string; avatar: string | null };
 
@@ -94,8 +95,8 @@ export function CheckinView({
     haptic(20);
     startTransition(async () => {
       const coords = await getPosition();
-      const res = await startCheckin(coords, session?.place ?? plan?.place ?? null);
-      if (res.error) {
+      const res = await attempt(() => startCheckin(coords, session?.place ?? plan?.place ?? null));
+      if ("error" in res && res.error) {
         play("error");
         setError(res.error);
       }
@@ -106,9 +107,9 @@ export function CheckinView({
     if (!session) return;
     finishedId.current = session.id;
     startTransition(async () => {
-      const res = await finishCheckin(session.id, mood, null);
-      if (res.error) setError(res.error);
-      else if (res.summary) {
+      const res = await attempt(() => finishCheckin(session.id, mood, null));
+      if ("error" in res && res.error) setError(res.error);
+      else if ("summary" in res && res.summary) {
         setSummary(res.summary);
         play("chime");
         haptic([30, 50, 30]);
@@ -122,10 +123,10 @@ export function CheckinView({
     e.target.value = "";
     if (!file || !session) return;
     startTransition(async () => {
-      const up = await uploadPhoto(createClient(), file, `${coupleId}/ketemu/${session.id}`);
+      const up = await uploadPhoto(createClient(), file, `${coupleId}/ketemu/${session.id}`).catch(() => ({ error: OFFLINE }));
       if ("error" in up) return setError(`Gagal mengunggah: ${up.error}`);
-      const res = await addCheckinPhoto(up.path, up.thumbPath, session.id);
-      if (res.error) setError(res.error);
+      const res = await attempt(() => addCheckinPhoto(up.path, up.thumbPath, session.id));
+      if ("error" in res && res.error) setError(res.error);
       else setPhotos((n) => n + 1);
     });
   }
@@ -184,8 +185,9 @@ export function CheckinView({
               className="chip self-start"
               onClick={() =>
                 startTransition(async () => {
-                  await saveCheckinNote(finishedId.current!, note.trim());
-                  setNoteSaved(true);
+                  const res = await attempt(() => saveCheckinNote(finishedId.current!, note.trim()));
+                  if ("error" in res && res.error) setError(res.error);
+                  else setNoteSaved(true);
                 })
               }
             >
@@ -193,6 +195,7 @@ export function CheckinView({
             </button>
           )}
         </div>
+        <FormMessage state={{ error }} />
         <Link href="/galeri" className="btn btn-primary">Lihat galeri</Link>
         <button type="button" onClick={() => setSummary(null)} className="btn btn-ghost">Selesai</button>
       </div>
@@ -287,7 +290,7 @@ export function CheckinView({
               <span className="size-2.5 rounded-full bg-[#7FF0C8]" style={{ animation: "beat 1.6s ease-in-out infinite" }} />
               Lagi ketemu{session.place ? ` · ${session.place}` : ""}
             </p>
-            <p className="relative font-display text-[60px] leading-none font-semibold tabular-nums">
+            <p className="relative font-display text-[60px] leading-none font-semibold tabular-nums" suppressHydrationWarning>
               {clock(now - new Date(session.together_at).getTime())}
             </p>
             <p className="relative text-sm opacity-90">sudah bareng hari ini</p>

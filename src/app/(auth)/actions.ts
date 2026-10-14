@@ -45,6 +45,7 @@ export async function signup(_prev: ActionState, formData: FormData): Promise<Ac
   const email = read(formData, "email");
   const password = String(formData.get("password") ?? "");
   if (!name) return { error: "Isi nama panggilan kamu." };
+  if (name.length > 40) return { error: "Nama panggilan maksimal 40 karakter." };
   if (!email) return { error: "Isi email kamu." };
   if (password.length < 8) return { error: "Kata sandi minimal 8 karakter." };
 

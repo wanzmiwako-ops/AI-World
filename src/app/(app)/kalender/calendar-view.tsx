@@ -7,6 +7,7 @@ import { Cat } from "@/components/cat";
 import { Icon } from "@/components/icon";
 import { FormMessage } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
+import { OFFLINE } from "@/lib/offline";
 
 export type CalendarMeeting = {
   id: string;
@@ -46,7 +47,12 @@ export function CalendarView({
   const [adding, setAdding] = useState(false);
   const [state, action] = useActionState(async (prev: Awaited<ReturnType<typeof createMeeting>>, fd: FormData) => {
     const res = await createMeeting(prev, fd);
-    if (res?.ok) setAdding(false);
+    if (res?.ok) {
+      setAdding(false);
+      // tampilkan hari jadwal yang baru dibuat (kalau masih di bulan ini)
+      const day = String(fd.get("starts_at") ?? "").slice(0, 10);
+      if (day.startsWith(monthKey)) setSelected(day);
+    }
     return res;
   }, undefined);
   const [, startTransition] = useTransition();
@@ -63,7 +69,7 @@ export function CalendarView({
   ];
   const selectedMeetings = byDay.get(selected) ?? [];
   const selectedDate = new Date(`${selected}T12:00:00+07:00`);
-  const selectedLabel = new Intl.DateTimeFormat("id-ID", { weekday: "long", day: "numeric", month: "long" }).format(selectedDate);
+  const selectedLabel = new Intl.DateTimeFormat("id-ID", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Jakarta" }).format(selectedDate);
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
@@ -131,7 +137,7 @@ export function CalendarView({
           <form action={action} className="card flex animate-rise flex-col gap-3 p-5">
             <div className="flex flex-col gap-2">
               <label htmlFor="title" className="label">Mau ngapain?</label>
-              <input id="title" name="title" required placeholder="Piknik sore" className="field" />
+              <input id="title" name="title" required maxLength={200} placeholder="Piknik sore" className="field" />
             </div>
             <div className="flex flex-col gap-2">
               <label htmlFor="starts_at" className="label">Kapan?</label>
@@ -139,11 +145,11 @@ export function CalendarView({
             </div>
             <div className="flex flex-col gap-2">
               <label htmlFor="place" className="label">Di mana? (opsional)</label>
-              <input id="place" name="place" placeholder="Kebun Raya" className="field" />
+              <input id="place" name="place" maxLength={200} placeholder="Kebun Raya" className="field" />
             </div>
             <div className="flex flex-col gap-2">
               <label htmlFor="note" className="label">Catatan (opsional)</label>
-              <input id="note" name="note" placeholder="Aku bawa kartu UNO" className="field" />
+              <input id="note" name="note" maxLength={2000} placeholder="Aku bawa kartu UNO" className="field" />
             </div>
             <FormMessage state={state} />
             <SubmitButton pendingText="Menyimpan…">Simpan jadwal</SubmitButton>
@@ -180,7 +186,7 @@ export function CalendarView({
                 type="button"
                 aria-label="Hapus jadwal"
                 onClick={() => {
-                  if (confirm("Hapus jadwal ini?")) startTransition(() => deleteMeeting(mt.id));
+                  if (confirm("Hapus jadwal ini?")) startTransition(() => deleteMeeting(mt.id).catch(() => alert(OFFLINE)));
                 }}
                 className="flex size-[52px] items-center justify-center rounded-full bg-sky text-muted"
               >

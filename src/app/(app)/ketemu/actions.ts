@@ -12,7 +12,7 @@ export async function startCheckin(coords: { lat: number; lng: number } | null, 
   const viewer = await requireCouple();
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("checkin", {
-    p_place: place,
+    p_place: place?.slice(0, 200) ?? null,
     p_lat: coords?.lat ?? null,
     p_lng: coords?.lng ?? null,
   });
@@ -80,6 +80,6 @@ export async function addCheckinPhoto(path: string, thumbPath: string | null, se
 export async function saveCheckinNote(sessionId: string, note: string) {
   await requireCouple();
   const supabase = await createClient();
-  await supabase.from("checkin_sessions").update({ note }).eq("id", sessionId);
+  await supabase.from("checkin_sessions").update({ note: note.slice(0, 2000) }).eq("id", sessionId);
   return { ok: true };
 }

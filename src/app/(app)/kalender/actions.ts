@@ -15,7 +15,10 @@ export async function createMeeting(_prev: ActionState, formData: FormData): Pro
   const note = String(formData.get("note") ?? "").trim() || null;
   const whenLocal = String(formData.get("starts_at") ?? "");
   if (!title) return { error: "Kasih nama rencananya, ya." };
-  if (!whenLocal) return { error: "Pilih tanggal dan jam." };
+  if (title.length > 200 || (place?.length ?? 0) > 200 || (note?.length ?? 0) > 2000) return { error: "Tulisannya terlalu panjang." };
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(whenLocal) || Number.isNaN(Date.parse(`${whenLocal.slice(0, 16)}:00+07:00`))) {
+    return { error: "Pilih tanggal dan jam." };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.from("meetings").insert({

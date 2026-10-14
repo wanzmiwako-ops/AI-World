@@ -1,3 +1,4 @@
+import { LiveRefresh } from "@/components/live/live-refresh";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Heart } from "@/components/cat";
@@ -100,6 +101,7 @@ export default function LoveMeterPage() {
   return (
     <Page>
       <PageHeader title="Love Meter" subtitle="Seberapa hangat kalian minggu ini" back="/" />
+      <LiveRefresh kinds={["mood"]} />
       <Suspense fallback={<PageSkeleton />}>
         <LoveContent />
       </Suspense>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { sendNudge } from "@/app/(app)/live-actions";
+import { attempt } from "@/lib/offline";
 import { CatPair, Heart } from "@/components/cat";
 import { Icon } from "@/components/icon";
 import { pageName } from "@/components/partner-status";
@@ -121,7 +122,7 @@ export function SideRail() {
                 haptic([10, 30, 10]);
                 setSent(true);
                 start(async () => {
-                  await sendNudge("kangen");
+                  await attempt(() => sendNudge("kangen"));
                   setTimeout(() => setSent(false), 2500);
                 });
               }}

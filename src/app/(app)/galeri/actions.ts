@@ -9,7 +9,9 @@ import { requireCouple } from "@/lib/dal";
 export async function addPhotos(items: { path: string; thumbPath: string | null }[], caption: string | null) {
   const viewer = await requireCouple();
   const prefix = `${viewer.couple.id}/`;
-  const valid = items.filter((i) => i.path.startsWith(prefix) && (!i.thumbPath || i.thumbPath.startsWith(prefix)));
+  const valid = items
+    .slice(0, 50)
+    .filter((i) => typeof i.path === "string" && i.path.startsWith(prefix) && !i.path.includes("..") && (!i.thumbPath || i.thumbPath.startsWith(prefix)));
   if (!valid.length) return { error: "Tidak ada foto yang valid." };
   const supabase = await createClient();
   const { error } = await supabase.from("photos").insert(
@@ -18,7 +20,7 @@ export async function addPhotos(items: { path: string; thumbPath: string | null 
       uploaded_by: viewer.userId,
       storage_path: i.path,
       thumb_path: i.thumbPath,
-      caption: caption?.trim() || null,
+      caption: caption?.trim().slice(0, 500) || null,
     })),
   );
   if (error) return { error: error.message };

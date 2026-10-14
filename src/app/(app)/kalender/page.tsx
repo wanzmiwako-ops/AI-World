@@ -1,3 +1,4 @@
+import { LiveRefresh } from "@/components/live/live-refresh";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Page, PageHeader, PageSkeleton } from "@/components/ui";
@@ -12,7 +13,7 @@ export const metadata: Metadata = { title: "Kalender" };
 async function CalendarContent({ searchParams }: { searchParams: PageProps<"/kalender">["searchParams"] }) {
   const params = await searchParams;
   const today = dayKey();
-  const raw = typeof params.m === "string" && /^\d{4}-\d{2}$/.test(params.m) ? params.m : today.slice(0, 7);
+  const raw = typeof params.m === "string" && /^(19|20)\d{2}-(0[1-9]|1[0-2])$/.test(params.m) ? params.m : today.slice(0, 7);
   const [y, m] = raw.split("-").map(Number);
 
   // Rentang bulan dalam waktu Jakarta (UTC+7)
@@ -65,6 +66,7 @@ export default function KalenderPage(props: PageProps<"/kalender">) {
   return (
     <Page>
       <PageHeader title="Kalender" subtitle="Jadwal ketemu kalian berdua" />
+      <LiveRefresh kinds={["meeting", "meeting_deleted"]} />
       <Suspense fallback={<PageSkeleton />}>
         <CalendarContent searchParams={props.searchParams} />
       </Suspense>

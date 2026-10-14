@@ -16,6 +16,7 @@ export async function createIssue(_prev: ActionState, formData: FormData): Promi
   const categoryRaw = String(formData.get("category") ?? "Lainnya");
   const category = CATEGORIES.includes(categoryRaw) ? categoryRaw : "Lainnya";
   if (!title) return { error: "Tulis topiknya dulu, ya." };
+  if (title.length > 200 || feeling.length > 4000) return { error: "Tulisannya terlalu panjang." };
 
   const supabase = await createClient();
   const { error } = await supabase.from("issues").insert({
@@ -43,6 +44,7 @@ export async function respondIssue(_prev: ActionState, formData: FormData): Prom
   const issueId = String(formData.get("issue_id") ?? "");
   const feeling = String(formData.get("feeling") ?? "").trim();
   if (!feeling) return { error: "Tulis apa yang kamu rasakan dulu." };
+  if (feeling.length > 4000) return { error: "Tulisannya terlalu panjang." };
   const supabase = await createClient();
   const { error } = await supabase.from("issue_responses").insert({ issue_id: issueId, feeling });
   if (error) return { error: error.message };
@@ -63,6 +65,7 @@ export async function resolveIssue(_prev: ActionState, formData: FormData): Prom
   const issueId = String(formData.get("issue_id") ?? "");
   const agreement = String(formData.get("agreement") ?? "").trim();
   if (!agreement) return { error: "Tulis kesepakatan kalian dulu." };
+  if (agreement.length > 2000) return { error: "Tulisannya terlalu panjang." };
   const supabase = await createClient();
   const { error } = await supabase
     .from("issues")

@@ -1,3 +1,4 @@
+import { LiveRefresh } from "@/components/live/live-refresh";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Heart } from "@/components/cat";
@@ -251,6 +252,7 @@ async function Dashboard() {
 export default function HomePage() {
   return (
     <Page>
+      <LiveRefresh kinds={["meeting", "meeting_deleted", "photo", "issue", "issue_response", "issue_resolved", "mood"]} />
       <Suspense fallback={<div className="pt-[max(calc(env(safe-area-inset-top)+16px),24px)]"><PageSkeleton /></div>}>
         <Dashboard />
       </Suspense>
