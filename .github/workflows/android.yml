@@ -1,0 +1,103 @@
+# Membuat APK Android A&I WORLD secara otomatis di cloud GitHub.
+# Jalan saat: tombol "Run workflow" di tab Actions, atau push yang mengubah bagian aplikasi Android.
+# Hasil: tab Releases → "A&I WORLD Android" → file A-I-WORLD.apk
+name: Build APK Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - "native-shell/**"
+      - "capacitor.config.ts"
+      - "scripts/cap-sync.mjs"
+      - "package.json"
+      - ".github/workflows/android.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CAP_SERVER_URL: ${{ vars.CAP_SERVER_URL }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Cek pengaturan
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          missing=""
+          [ -z "$CAP_SERVER_URL" ] && missing="$missing\n - Variable CAP_SERVER_URL (alamat Vercel, misal https://nama-app.vercel.app)"
+          [ -z "$GOOGLE_SERVICES_JSON" ] && missing="$missing\n - Secret GOOGLE_SERVICES_JSON (isi file google-services.json dari Firebase)"
+          [ -z "$ANDROID_KEYSTORE_BASE64" ] && missing="$missing\n - Secret ANDROID_KEYSTORE_BASE64"
+          [ -z "$ANDROID_KEYSTORE_PASSWORD" ] && missing="$missing\n - Secret ANDROID_KEYSTORE_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo -e "Belum diisi di GitHub → Settings → Secrets and variables → Actions:$missing"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install paket
+        run: npm ci
+
+      - name: Siapkan Firebase & kunci tanda tangan
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+
+      - name: Sinkronkan Capacitor
+        run: node scripts/cap-sync.mjs
+
+      - name: Build APK
+        working-directory: android
+        env:
+          APP_VERSION_CODE: ${{ github.run_number }}
+          APP_VERSION_NAME: 1.0.${{ github.run_number }}
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || 'aiworld' }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/A-I-WORLD.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: A-I-WORLD-apk
+          path: A-I-WORLD.apk
+
+      - name: Terbitkan di Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-v${{ github.run_number }}
+          name: A&I WORLD Android 1.0.${{ github.run_number }}
+          body: |
+            Unduh **A-I-WORLD.apk** di bawah, buka di HP Android, lalu izinkan "Instal aplikasi tidak dikenal".
+            Versi baru bisa langsung dipasang menimpa yang lama (data tidak hilang).
+          files: A-I-WORLD.apk
+          make_latest: true
