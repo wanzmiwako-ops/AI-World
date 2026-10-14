@@ -6,15 +6,6 @@ import { burstHearts, haptic, play, rainHearts } from "@/lib/feel";
 const HEART =
   "M100 172 C 42 128, 4 98, 4 56 C 4 26, 26 6, 54 6 C 74 6, 90 18, 100 34 C 110 18, 126 6, 146 6 C 174 6, 196 26, 196 56 C 196 98, 158 128, 100 172 Z";
 
-/** Tingkatan Love Meter dengan emoji. */
-export function loveTier(score: number) {
-  if (score >= 85) return { emoji: "🔥", label: "Lengket banget!" };
-  if (score >= 70) return { emoji: "💗", label: "Hangat & manis" };
-  if (score >= 55) return { emoji: "🌤️", label: "Hangat-hangat kuku" };
-  if (score >= 40) return { emoji: "🥺", label: "Butuh perhatian" };
-  return { emoji: "🧊", label: "Butuh pelukan" };
-}
-
 /**
  * Hati berisi "cairan cinta" yang naik sesuai skor, dengan ombak bergerak.
  * Interaktif: diketuk → berdetak & hati beterbangan; 5× ketuk → hujan hati + meong.
