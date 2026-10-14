@@ -54,6 +54,7 @@ Semua data dijaga di database dengan RLS: hanya kalian berdua yang bisa membaca 
    4. `20261014090000_pin_notifikasi_kangen.sql`: kunci PIN, notifikasi push, "kirim kangen", aktivitas realtime
    5. `20261014150000_tema_game.sql`: tema dunia & game bareng
    6. `20261014200000_balas_aplikasi.sql`: balas bubble chat & notifikasi aplikasi Android
+   7. `20261014230000_audit_keamanan.sql`: pengetatan keamanan hasil audit (foto, PIN, hak ubah data, batas teks)
 
    > Sudah pernah menjalankan sebagian? Cukup jalankan file yang belum.
 3. Buka **Authentication → URL Configuration**:

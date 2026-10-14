@@ -31,10 +31,12 @@ const config: CapacitorConfig = {
       showSpinner: false,
       androidScaleType: "CENTER_INSIDE",
     },
-    StatusBar: {
-      overlaysWebView: false,
+    // Android 15+: aplikasi tampil penuh sampai ke balik bar status. Jarak atas/bawah
+    // diatur lewat env(safe-area-inset-*) yang sudah dipakai di tampilan web.
+    SystemBars: {
+      insetsHandling: "css",
+      initialViewportFitValueHint: "cover",
       style: "LIGHT",
-      backgroundColor: "#F2F8FC",
     },
     FirebaseMessaging: {
       presentationOptions: ["badge", "sound", "alert"],

@@ -20,10 +20,10 @@
 			"showSpinner": false,
 			"androidScaleType": "CENTER_INSIDE"
 		},
-		"StatusBar": {
-			"overlaysWebView": false,
-			"style": "LIGHT",
-			"backgroundColor": "#F2F8FC"
+		"SystemBars": {
+			"insetsHandling": "css",
+			"initialViewportFitValueHint": "cover",
+			"style": "LIGHT"
 		},
 		"FirebaseMessaging": {
 			"presentationOptions": [
