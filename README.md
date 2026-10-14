@@ -55,6 +55,7 @@ Semua data dijaga di database dengan RLS: hanya kalian berdua yang bisa membaca 
    5. `20261014150000_tema_game.sql`: tema dunia & game bareng
    6. `20261014200000_balas_aplikasi.sql`: balas bubble chat & notifikasi aplikasi Android
    7. `20261014230000_audit_keamanan.sql`: pengetatan keamanan hasil audit (foto, PIN, hak ubah data, batas teks)
+   8. `20261014240000_notifikasi_andal.sql`: notifikasi lebih andal (deteksi "sedang membuka aplikasi" lebih cepat)
 
    > Sudah pernah menjalankan sebagian? Cukup jalankan file yang belum.
 3. Buka **Authentication → URL Configuration**:

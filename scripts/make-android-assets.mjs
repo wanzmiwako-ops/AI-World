@@ -56,35 +56,8 @@ for (const [d, [w, h]] of Object.entries(splashSizes)) {
 }
 await splash(480, 320, `${RES}/drawable/splash.png`);
 
-// Suara "meong" pendek untuk notifikasi pesan (WAV 22 kHz, mono)
-const rate = 22050;
-const dur = 0.62;
-const n = Math.floor(rate * dur);
-const pcm = Buffer.alloc(n * 2);
-let phase = 0;
-for (let i = 0; i < n; i++) {
-  const t = i / rate;
-  const p = t / dur;
-  // nada naik lalu turun (me-oong), dengan getaran kecil
-  const f0 = 520 + 380 * Math.sin(Math.PI * Math.min(p * 1.25, 1)) - 160 * p + 18 * Math.sin(2 * Math.PI * 7 * t);
-  phase += (2 * Math.PI * f0) / rate;
-  const env = Math.min(1, t / 0.04) * Math.pow(1 - p, 1.4);
-  const v = 0.55 * Math.sin(phase) + 0.22 * Math.sin(2 * phase + 0.3) + 0.1 * Math.sin(3 * phase);
-  pcm.writeInt16LE(Math.round(Math.max(-1, Math.min(1, v * env)) * 32767 * 0.8), i * 2);
-}
-const wav = Buffer.alloc(44);
-wav.write("RIFF", 0);
-wav.writeUInt32LE(36 + pcm.length, 4);
-wav.write("WAVEfmt ", 8);
-wav.writeUInt32LE(16, 16);
-wav.writeUInt16LE(1, 20);
-wav.writeUInt16LE(1, 22);
-wav.writeUInt32LE(rate, 24);
-wav.writeUInt32LE(rate * 2, 28);
-wav.writeUInt16LE(2, 32);
-wav.writeUInt16LE(16, 34);
-wav.write("data", 36);
-wav.writeUInt32LE(pcm.length, 40);
+// Suara notifikasi pesan: rekaman meong kucing (scripts/sounds/meow.ogg)
 fs.mkdirSync(`${RES}/raw`, { recursive: true });
-fs.writeFileSync(`${RES}/raw/meow.wav`, Buffer.concat([wav, pcm]));
+for (const f of fs.readdirSync(`${RES}/raw`)) if (f.startsWith("meow.")) fs.rmSync(`${RES}/raw/${f}`);
+fs.copyFileSync(new URL("./sounds/meow.ogg", import.meta.url), `${RES}/raw/meow.ogg`);
 console.log("aset Android dibuat");
