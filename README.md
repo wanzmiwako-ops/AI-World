@@ -23,6 +23,9 @@ Maskotnya sepasang kucing: **Mochi** (biru) dan **Boba** (oren).
 | **Kunci PIN** | PIN 4 angka (disimpan sebagai hash bcrypt, dicek di server). Terkunci otomatis setelah 1/5/15 menit ditinggal. 5× salah → jeda. Lupa PIN → masuk pakai kata sandi akun. |
 | **Kirim rasa** | Kangen, Peluk, Cium, Semangat: satu ketukan, pasangan langsung dapat kejutan layar penuh + notifikasi. |
 | **Suasana** | Kucing bisa dicolek (melompat, mengeong, bicara), hati beterbangan, efek suara & getar, status "Ica lagi online · buka Galeri", sapaan sesuai waktu, perayaan hari ke-100/anniversary. |
+| **Tema dunia** | 7 tema untuk berdua: Samudra Biru, Taman Bunga, Hutan Safari, Pasar Malam, Misteri Malam, Malam Bioskop, Luar Angkasa. Warna, hiasan melayang, dan gambar khas ikut berubah, dan langsung berganti juga di HP pasangan. |
+| **Main bareng** | 5 game realtime berdua: **Teka-Teki Silang** (papan baru setiap main, isi bareng di satu papan), **UNO Kucing**, **Kita Sehati?** (jawab diam-diam, lihat seberapa kompak), **XO Kucing**, dan **Kartu Ngobrol** (pertanyaan manis, dalam, lucu, tantangan). Ada papan skor, ajakan main lewat notifikasi, dan status "giliranmu". |
+| **Tampilan PC** | Menu samping, konten lebih lebar, panel kanan (pasangan, game berjalan, jadwal, ide hari ini), dan latar bertema. |
 | **Akun** | Ganti foto profil, nama panggilan, tanggal jadian, ganti kata sandi (wajib kata sandi lama), bagikan kode undangan, keluar. |
 
 ## Teknologi (versi terbaru per Oktober 2026)
@@ -48,6 +51,7 @@ Semua data dijaga di database dengan RLS: hanya kalian berdua yang bisa membaca 
    2. `20261013170000_gabung_pakai_kode.sql`: supaya bisa gabung pakai kode walau sudah sama-sama membuat ruang
    3. `20261013210000_lebih_cepat.sql`: mempercepat aplikasi (query digabung, index, thumbnail foto)
    4. `20261014090000_pin_notifikasi_kangen.sql`: kunci PIN, notifikasi push, "kirim kangen", aktivitas realtime
+   5. `20261014150000_tema_game.sql`: tema dunia & game bareng
 
    > Sudah pernah menjalankan sebagian? Cukup jalankan file yang belum.
 3. Buka **Authentication → URL Configuration**:
@@ -122,6 +126,8 @@ src/
     (app)/                    ← semua halaman setelah login
       page.tsx                ← Beranda
       chat/  kalender/  ketemu/  love-meter/  ide/  ruang-bicara/  galeri/  akun/
+      main/                   ← Main Bareng (daftar game) & main/[id] (ruang game)
+      tema/                   ← pilih tema dunia
     manifest.ts               ← PWA
   components/                 ← kucing (cat.tsx), logo, menu, komponen UI
   lib/
@@ -129,6 +135,8 @@ src/
     supabase/                 ← client untuk server, browser, dan proxy
     realtime.ts               ← hook Realtime Broadcast + Presence
     love-meter.ts             ← rumus skor Love Meter
+    themes.ts                 ← daftar tema (warnanya di globals.css)
+    games/                    ← aturan game: TTS (pembuat papan), UNO, XO, kartu
 supabase/migrations/          ← skema database lengkap
 scripts/                      ← pembuat ikon PWA
 ```
