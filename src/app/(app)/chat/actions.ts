@@ -7,17 +7,26 @@ import { requireCouple } from "@/lib/dal";
 import { signedUrls } from "@/lib/storage";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Message } from "@/lib/types";
+import { MESSAGE_COLS } from "@/lib/chat";
 
-export type ChatMessage = Message & { url?: string; fullUrl?: string };
+export type ReplyRef = Pick<Message, "id" | "sender_id" | "kind" | "body">;
+export type ChatMessage = Message & { url?: string; fullUrl?: string; reply?: ReplyRef | null };
 
 const KINDS = ["text", "heart", "photo", "sticker"] as const;
 
-export async function sendMessage(input: { kind: Message["kind"]; body?: string | null; mediaPath?: string | null; thumbPath?: string | null }) {
+export async function sendMessage(input: {
+  kind: Message["kind"];
+  body?: string | null;
+  mediaPath?: string | null;
+  thumbPath?: string | null;
+  replyTo?: string | null;
+}) {
   const viewer = await requireCouple();
   if (!KINDS.includes(input.kind)) return { error: "Jenis pesan tidak dikenal." };
   const body = input.body?.trim().slice(0, 2000) || null;
   if (input.kind === "text" && !body) return { error: "Pesan kosong." };
   const prefix = `${viewer.couple.id}/`;
+  const replyTo = input.replyTo && /^[0-9a-f-]{36}$/i.test(input.replyTo) ? input.replyTo : null;
   if ((input.mediaPath && !input.mediaPath.startsWith(prefix)) || (input.thumbPath && !input.thumbPath.startsWith(prefix))) {
     return { error: "Lokasi foto tidak valid." };
   }
@@ -32,8 +41,9 @@ export async function sendMessage(input: { kind: Message["kind"]; body?: string 
       body,
       media_path: input.mediaPath ?? null,
       thumb_path: input.thumbPath ?? null,
+      reply_to: replyTo,
     })
-    .select()
+    .select(MESSAGE_COLS)
     .single();
   if (error) return { error: error.message };
 
@@ -41,7 +51,7 @@ export async function sendMessage(input: { kind: Message["kind"]; body?: string 
   after(() =>
     notifyPartner(supabase, {
       title: viewer.profile.display_name,
-      body: messagePreview(input.kind, body),
+      body: replyTo ? `↩ ${messagePreview(input.kind, body)}` : messagePreview(input.kind, body),
       url: "/chat",
       tag: "chat",
     }),
@@ -60,7 +70,7 @@ export async function loadOlder(beforeIso: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("messages")
-    .select("*")
+    .select(MESSAGE_COLS)
     .lt("created_at", beforeIso)
     .order("created_at", { ascending: false })
     .limit(40);

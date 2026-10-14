@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { daysBetween, formatShort } from "@/lib/dates";
 import { signedUrls } from "@/lib/storage";
 import type { ChatMessage } from "./actions";
+import { MESSAGE_COLS } from "@/lib/chat";
 import { ChatView } from "./chat-view";
 
 export const metadata: Metadata = { title: "Chat" };
@@ -17,7 +18,7 @@ async function ChatContent() {
   // Pesan, jadwal, dan data akun diambil bersamaan (RLS menjaga datanya).
   const [viewer, msgRes, nextRes] = await Promise.all([
     requireCouple(),
-    supabase.from("messages").select("*").order("created_at", { ascending: false }).limit(60),
+    supabase.from("messages").select(MESSAGE_COLS).order("created_at", { ascending: false }).limit(60),
     supabase
       .from("meetings")
       .select("title, starts_at")

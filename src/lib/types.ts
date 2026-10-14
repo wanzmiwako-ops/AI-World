@@ -73,6 +73,7 @@ export type Message = {
   body: string | null;
   media_path: string | null;
   thumb_path?: string | null;
+  reply_to?: string | null;
   created_at: string;
   read_at: string | null;
 };

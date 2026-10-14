@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
-import { loadOlder, markRead, sendMessage, type ChatMessage } from "./actions";
+import { loadOlder, markRead, sendMessage, type ChatMessage, type ReplyRef } from "./actions";
 import { Cat, Heart } from "@/components/cat";
 import { Icon } from "@/components/icon";
 import { Avatar } from "@/components/ui";
@@ -26,6 +26,220 @@ function dayLabel(iso: string) {
   if (k === today) return "Hari ini";
   if (k === yesterday) return "Kemarin";
   return dayFmt.format(new Date(iso));
+}
+
+function preview(r: Pick<ReplyRef, "kind" | "body">) {
+  if (r.kind === "photo") return "📷 Foto";
+  if (r.kind === "heart") return "❤ Hati";
+  if (r.kind === "sticker") return "🐱 Stiker kucing";
+  return r.body ?? "";
+}
+
+/** Kotak kutipan pesan yang dibalas. Diketuk → lompat ke pesan aslinya. */
+function Quote({
+  reply,
+  who,
+  mine,
+  inBubble,
+  onJump,
+}: {
+  reply: ReplyRef | null;
+  who: string;
+  mine: boolean;
+  inBubble: boolean;
+  onJump?: () => void;
+}) {
+  const tone = inBubble && mine ? "bg-white/18 border-white/70 text-white" : "bg-sky border-ocean text-navy";
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onJump?.();
+      }}
+      className={`flex w-full min-w-0 flex-col rounded-[14px] border-l-4 px-3 py-1.5 text-left ${tone}`}
+    >
+      <span className={`text-[12px] font-bold ${inBubble && mine ? "" : "text-ocean"}`}>{who}</span>
+      <span className={`line-clamp-2 text-[13px] ${inBubble && mine ? "opacity-90" : "text-ink-soft"}`}>
+        {reply ? preview(reply) : "Pesan sebelumnya"}
+      </span>
+    </button>
+  );
+}
+
+const SWIPE = 56;
+
+/** Satu bubble: geser ke kanan (HP), tekan lama (menu), atau tombol Balas saat diarahkan kursor (PC). */
+function MessageRow({
+  m,
+  mine,
+  quote,
+  quoteWho,
+  status,
+  flash,
+  menuOpen,
+  partnerName,
+  onReply,
+  onJump,
+  onMenu,
+}: {
+  m: ChatMessage;
+  mine: boolean;
+  quote: { reply: ReplyRef | null } | null;
+  quoteWho: string;
+  status: string | null;
+  flash: boolean;
+  menuOpen: boolean;
+  partnerName: string;
+  onReply: (m: ChatMessage) => void;
+  onJump: (id: string) => void;
+  onMenu: (id: string | null) => void;
+}) {
+  const [dx, setDx] = useState(0);
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const hold = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const armed = useRef(false);
+  const temp = m.id.startsWith("temp-");
+
+  function clearHold() {
+    if (hold.current) clearTimeout(hold.current);
+    hold.current = null;
+  }
+  function reset() {
+    start.current = null;
+    armed.current = false;
+    clearHold();
+    setDx(0);
+  }
+
+  const bubble = mine ? "rounded-[22px_22px_6px_22px] bg-ocean text-white" : "rounded-[22px_22px_22px_6px] bg-white text-navy";
+  const jump = () => m.reply_to && onJump(m.reply_to);
+
+  return (
+    <div
+      id={`msg-${m.id}`}
+      className={`group relative flex animate-rise flex-col gap-1 rounded-[24px] transition-colors duration-700 ${mine ? "items-end" : "items-start"} ${flash ? "bg-sand/60" : ""}`}
+      style={{ animationDuration: ".3s", touchAction: "pan-y" }}
+      onPointerDown={(e) => {
+        if (temp || e.pointerType === "mouse") return;
+        start.current = { x: e.clientX, y: e.clientY };
+        clearHold();
+        hold.current = setTimeout(() => {
+          haptic(20);
+          onMenu(m.id);
+          start.current = null;
+        }, 480);
+      }}
+      onPointerMove={(e) => {
+        const s0 = start.current;
+        if (!s0) return;
+        const ddx = e.clientX - s0.x;
+        const ddy = e.clientY - s0.y;
+        if (Math.abs(ddx) > 6 || Math.abs(ddy) > 6) clearHold();
+        if (Math.abs(ddy) > 12 && Math.abs(ddy) > Math.abs(ddx)) return reset();
+        const next = Math.max(0, Math.min(ddx, 84));
+        setDx(next);
+        if (next >= SWIPE && !armed.current) {
+          armed.current = true;
+          haptic(12);
+        }
+      }}
+      onPointerUp={() => {
+        if (armed.current) onReply(m);
+        reset();
+      }}
+      onPointerCancel={reset}
+    >
+      {/* Ikon balas yang muncul saat digeser */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1/2 left-1 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white text-ocean shadow-soft"
+        style={{ opacity: Math.min(dx / SWIPE, 1), transform: `translateY(-50%) scale(${0.6 + Math.min(dx / SWIPE, 1) * 0.4})` }}
+      >
+        <Icon name="reply" size={18} />
+      </span>
+
+      <div
+        className={`flex max-w-full flex-col gap-1 ${mine ? "items-end" : "items-start"}`}
+        style={{ transform: dx ? `translateX(${dx}px)` : undefined, transition: dx ? "none" : "transform .2s ease" }}
+      >
+        <div className={`flex max-w-full items-center gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
+          {m.kind === "text" ? (
+            <div className={`flex max-w-[78vw] flex-col gap-1.5 px-4 py-2.5 shadow-[0_3px_10px_rgba(11,37,69,0.05)] sm:max-w-[420px] lg:max-w-[520px] ${bubble} ${quote ? "pt-2" : ""}`}>
+              {quote && <Quote reply={quote.reply} who={quoteWho} mine={mine} inBubble onJump={jump} />}
+              <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap select-none [@media(hover:hover)]:select-text">{m.body}</p>
+            </div>
+          ) : (
+            <div className={`flex flex-col gap-1 ${mine ? "items-end" : "items-start"}`}>
+              {quote && (
+                <div className="w-56 max-w-[70vw]">
+                  <Quote reply={quote.reply} who={quoteWho} mine={mine} inBubble={false} onJump={jump} />
+                </div>
+              )}
+              {m.kind === "heart" && <Heart size={64} />}
+              {m.kind === "sticker" && (
+                <span role="img" aria-label="Stiker kucing kangen">
+                  <Cat variant={mine ? "mochi" : "boba"} size={100} mood="love" motion="hop" />
+                </span>
+              )}
+              {m.kind === "photo" && (
+                <a href={m.fullUrl ?? m.url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-[22px] bg-white p-1.5 shadow-soft">
+                  {m.url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={m.url} alt="Foto dari chat" loading="lazy" decoding="async" className="max-h-64 w-56 rounded-[17px] object-cover" />
+                  ) : (
+                    <span className="flex h-40 w-56 items-center justify-center rounded-[17px] bg-tint text-ocean">
+                      <Icon name="image" size={30} />
+                    </span>
+                  )}
+                </a>
+              )}
+            </div>
+          )}
+          {/* Tombol balas untuk PC (muncul saat kursor di atas pesan) */}
+          {!temp && (
+            <button
+              type="button"
+              onClick={() => onReply(m)}
+              aria-label={`Balas pesan ${mine ? "kamu" : partnerName}`}
+              className="hidden size-8 shrink-0 items-center justify-center rounded-full bg-white text-muted opacity-0 shadow-soft transition-opacity group-hover:opacity-100 hover:text-ocean focus-visible:opacity-100 [@media(hover:hover)]:flex"
+            >
+              <Icon name="reply" size={16} />
+            </button>
+          )}
+        </div>
+        <span className="px-1.5 text-[11px] text-muted">
+          {timeFmt.format(new Date(m.created_at))}
+          {status}
+        </span>
+      </div>
+
+      {menuOpen && (
+        <div
+          className={`z-10 flex gap-1 rounded-full bg-navy p-1 text-sm font-bold text-white shadow-[0_8px_24px_rgba(11,37,69,0.25)]`}
+          style={{ animation: "pop-in .25s cubic-bezier(.2,.9,.3,1.3) both" }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <button type="button" className="flex items-center gap-1.5 rounded-full px-3.5 py-2 active:bg-white/15" onClick={() => onReply(m)}>
+            <Icon name="reply" size={16} /> Balas
+          </button>
+          {m.kind === "text" && m.body && (
+            <button
+              type="button"
+              className="flex items-center gap-1.5 rounded-full px-3.5 py-2 active:bg-white/15"
+              onClick={() => {
+                void navigator.clipboard?.writeText(m.body ?? "");
+                play("tap");
+                onMenu(null);
+              }}
+            >
+              <Icon name="copy" size={16} /> Salin
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function ChatView({
@@ -53,7 +267,48 @@ export function ChatView({
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSent = useRef(0);
   const stickToBottom = useRef(true);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [flashId, setFlashId] = useState<string | null>(null);
   const partnerName = partner?.name ?? "Pasangan";
+  const nameOf = (uid: string) => (uid === me.id ? "Kamu" : partnerName);
+
+  // Menu tekan-lama tertutup saat mengetuk tempat lain
+  useEffect(() => {
+    if (!menuFor) return;
+    const close = () => setMenuFor(null);
+    const t = setTimeout(() => document.addEventListener("pointerdown", close, { once: true }), 0);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("pointerdown", close);
+    };
+  }, [menuFor]);
+
+  function startReply(m: ChatMessage) {
+    setMenuFor(null);
+    setReplyTo(m);
+    play("tap");
+    inputRef.current?.focus();
+  }
+
+  function jumpTo(id: string) {
+    const el = document.getElementById(`msg-${id}`);
+    if (!el) {
+      setError("Pesan itu ada di riwayat lama. Ketuk \"Muat pesan sebelumnya\" dulu, ya.");
+      return;
+    }
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setFlashId(id);
+    setTimeout(() => setFlashId((f) => (f === id ? null : f)), 1400);
+  }
+
+  // Tandai dibaca; kalau sinyal putus, abaikan saja (dicoba lagi nanti)
+  const readSafely = useCallback(async () => {
+    try {
+      await markRead();
+    } catch {}
+  }, []);
 
   const upsert = useCallback((m: ChatMessage, tempId?: string) => {
     setMessages((prev) => {
@@ -87,7 +342,7 @@ export function ChatView({
       if (document.visibilityState === "visible") {
         play("pop");
         haptic(15);
-        startTransition(() => markRead());
+        startTransition(readSafely);
       }
     }
   });
@@ -101,11 +356,11 @@ export function ChatView({
 
   // Tandai dibaca saat membuka chat & saat kembali ke tab
   useEffect(() => {
-    startTransition(() => markRead());
-    const onVisible = () => document.visibilityState === "visible" && startTransition(() => markRead());
+    startTransition(readSafely);
+    const onVisible = () => document.visibilityState === "visible" && startTransition(readSafely);
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, []);
+  }, [readSafely]);
 
   useLayoutEffect(() => {
     const el = listRef.current;
@@ -131,7 +386,11 @@ export function ChatView({
     play(kind === "heart" ? "pop" : "send");
     haptic(12);
     const tempId = `temp-${randomId()}`;
+    const replying = replyTo && !replyTo.id.startsWith("temp-") ? replyTo : null;
+    setReplyTo(null);
     upsert({
+      reply_to: replying?.id ?? null,
+      reply: replying ? { id: replying.id, sender_id: replying.sender_id, kind: replying.kind, body: replying.body } : null,
       id: tempId,
       couple_id: coupleId,
       sender_id: me.id,
@@ -144,7 +403,7 @@ export function ChatView({
       url: localUrl,
     });
     startTransition(async () => {
-      const res = await sendMessage({ kind, body, mediaPath, thumbPath });
+      const res = await sendMessage({ kind, body, mediaPath, thumbPath, replyTo: replying?.id ?? null });
       if (res.error || !res.message) {
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
         setError(res.error ?? "Pesan gagal terkirim.");
@@ -185,6 +444,7 @@ export function ChatView({
   }
 
   const lastMine = [...messages].reverse().find((m) => m.sender_id === me.id);
+  const byId = new Map(messages.map((m) => [m.id, m]));
 
   return (
     <div data-fullscreen className="flex h-dvh flex-col overflow-hidden lg:h-[calc(100dvh-48px)] lg:pt-6">
@@ -231,41 +491,26 @@ export function ChatView({
         {messages.map((m, i) => {
           const mine = m.sender_id === me.id;
           const showDay = i === 0 || dayLabel(messages[i - 1].created_at) !== dayLabel(m.created_at);
-          const bubble = mine
-            ? "rounded-[22px_22px_6px_22px] bg-ocean text-white"
-            : "rounded-[22px_22px_22px_6px] bg-white text-navy";
+          const original = m.reply_to ? (m.reply ?? byId.get(m.reply_to) ?? null) : null;
+          const quote = m.reply_to ? { reply: original } : null;
           return (
             <Fragment key={m.id}>
               {showDay && (
                 <span className="my-1 self-center rounded-[10px] bg-tint px-3 py-1 text-xs font-bold text-muted">{dayLabel(m.created_at)}</span>
               )}
-              <div className={`flex animate-rise flex-col gap-1 ${mine ? "items-end" : "items-start"}`} style={{ animationDuration: ".3s" }}>
-                {m.kind === "text" && (
-                  <p className={`max-w-[78%] px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap shadow-[0_3px_10px_rgba(11,37,69,0.05)] lg:max-w-[60%] ${bubble}`}>{m.body}</p>
-                )}
-                {m.kind === "heart" && <Heart size={64} />}
-                {m.kind === "sticker" && (
-                  <span role="img" aria-label="Stiker kucing kangen">
-                    <Cat variant={mine ? "mochi" : "boba"} size={100} mood="love" motion="hop" />
-                  </span>
-                )}
-                {m.kind === "photo" && (
-                  <a href={m.fullUrl ?? m.url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-[22px] bg-white p-1.5 shadow-soft">
-                    {m.url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={m.url} alt="Foto dari chat" loading="lazy" decoding="async" className="max-h-64 w-56 rounded-[17px] object-cover" />
-                    ) : (
-                      <span className="flex h-40 w-56 items-center justify-center rounded-[17px] bg-tint text-ocean">
-                        <Icon name="image" size={30} />
-                      </span>
-                    )}
-                  </a>
-                )}
-                <span className="px-1.5 text-[11px] text-muted">
-                  {timeFmt.format(new Date(m.created_at))}
-                  {m.id === lastMine?.id && (m.id.startsWith("temp-") ? " · Mengirim…" : m.read_at ? " · Dibaca" : " · Terkirim")}
-                </span>
-              </div>
+              <MessageRow
+                m={m}
+                mine={mine}
+                quote={quote}
+                quoteWho={original ? nameOf(original.sender_id) : "Balasan"}
+                status={m.id === lastMine?.id ? (m.id.startsWith("temp-") ? " · Mengirim…" : m.read_at ? " · Dibaca" : " · Terkirim") : null}
+                flash={flashId === m.id}
+                menuOpen={menuFor === m.id}
+                partnerName={partnerName}
+                onReply={startReply}
+                onJump={jumpTo}
+                onMenu={setMenuFor}
+              />
             </Fragment>
           );
         })}
@@ -284,6 +529,19 @@ export function ChatView({
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 14px)" }}
       >
         {error && <p role="alert" className="px-1 text-sm font-semibold text-[#9b1c3a]">{error}</p>}
+        {replyTo && (
+          <div className="flex animate-rise items-center gap-2" style={{ animationDuration: ".2s" }}>
+            <span className="flex size-8 shrink-0 items-center justify-center text-ocean">
+              <Icon name="reply" size={18} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <Quote reply={replyTo} who={`Membalas ${replyTo.sender_id === me.id ? "dirimu sendiri" : partnerName}`} mine={false} inBubble={false} onJump={() => jumpTo(replyTo.id)} />
+            </div>
+            <button type="button" aria-label="Batal membalas" onClick={() => setReplyTo(null)} className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky text-muted">
+              <Icon name="close" size={16} />
+            </button>
+          </div>
+        )}
         <div className="scroll-row flex gap-2">
           {QUICK.map((q) => (
             <button key={q} type="button" onClick={() => send("text", q)} className="chip min-h-9 bg-sky text-[13px] shadow-none">
@@ -301,13 +559,17 @@ export function ChatView({
           <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={onPhoto} aria-label="Pilih foto" />
           <label htmlFor="pesan" className="sr-only">Tulis pesan</label>
           <input
+            ref={inputRef}
             id="pesan"
             value={draft}
             onChange={(e) => {
               setDraft(e.target.value);
               notifyTyping();
             }}
-            placeholder="Tulis pesan…"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setReplyTo(null);
+            }}
+            placeholder={replyTo ? "Tulis balasan…" : "Tulis pesan…"}
             autoComplete="off"
             className="h-[46px] min-w-0 flex-1 rounded-full border-2 border-tint bg-sky px-4 text-base focus:border-ocean focus:outline-none"
           />
