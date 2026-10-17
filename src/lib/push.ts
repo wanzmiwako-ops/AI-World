@@ -92,6 +92,7 @@ export function messagePreview(kind: string, body: string | null) {
   if (kind === "photo") return "Mengirim foto";
   if (kind === "heart") return "Mengirim hati ❤";
   if (kind === "sticker") return "Mengirim stiker kucing";
+  if (kind === "voice") return "🎤 Mengirim voice note";
   const text = (body ?? "").trim();
   return text.length > 120 ? `${text.slice(0, 117)}…` : text;
 }

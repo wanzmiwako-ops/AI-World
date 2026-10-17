@@ -12,6 +12,7 @@ export const PAGES: Record<string, string> = {
   "/ide": "Ide Kencan",
   "/ruang-bicara": "Ruang Bicara",
   "/galeri": "Galeri",
+  "/timeline": "Timeline",
   "/akun": "Akun",
   "/main": "Main Bareng",
   "/tema": "Tema",

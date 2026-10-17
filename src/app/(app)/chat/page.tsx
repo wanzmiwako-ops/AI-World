@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui";
 import { requireCouple } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
 import { daysBetween, formatShort } from "@/lib/dates";
-import { signedUrls } from "@/lib/storage";
+import { withMediaUrls } from "@/lib/chat-server";
 import type { ChatMessage } from "./actions";
 import { MESSAGE_COLS } from "@/lib/chat";
 import { ChatView } from "./chat-view";
@@ -29,10 +29,7 @@ async function ChatContent() {
   ]);
 
   const list = ((msgRes.data ?? []) as ChatMessage[]).reverse();
-  const urls = await signedUrls(supabase, list.flatMap((m) => [m.thumb_path, m.media_path]));
-  const initial = list.map((m) =>
-    m.media_path ? { ...m, url: urls[m.thumb_path ?? m.media_path] ?? urls[m.media_path], fullUrl: urls[m.media_path] } : m,
-  );
+  const initial = await withMediaUrls(supabase, list);
 
   let nextMeeting: string | null = null;
   if (nextRes.data) {

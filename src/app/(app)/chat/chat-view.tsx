@@ -9,9 +9,11 @@ import { Avatar } from "@/components/ui";
 import { broadcast, useLive, useLiveEvent } from "@/lib/live";
 import { burstHearts, centerOf, haptic, play } from "@/lib/feel";
 import { createClient } from "@/lib/supabase/client";
-import { randomId, uploadPhoto } from "@/lib/image";
+import { randomId, uploadPhoto, uploadVoice } from "@/lib/image";
 import { attempt, OFFLINE } from "@/lib/offline";
-import { MESSAGE_COLS } from "@/lib/chat";
+import { kindPreview, MESSAGE_COLS } from "@/lib/chat";
+import { CameraCapture } from "@/components/camera-capture";
+import { RecordingBar, VoiceBubble, VoiceButton, type VoiceClip } from "@/components/voice";
 
 type Person = { id: string; name: string; avatar: string | null };
 
@@ -31,10 +33,34 @@ function dayLabel(iso: string) {
 }
 
 function preview(r: Pick<ReplyRef, "kind" | "body">) {
-  if (r.kind === "photo") return "📷 Foto";
-  if (r.kind === "heart") return "❤ Hati";
-  if (r.kind === "sticker") return "🐱 Stiker kucing";
-  return r.body ?? "";
+  return kindPreview(r.kind, r.body, 200);
+}
+
+/** Kartu kecil "membalas story" di atas bubble. */
+function StoryQuote({ m, mine, meId, partnerName }: { m: ChatMessage; mine: boolean; meId: string; partnerName: string }) {
+  const storyOfMe = m.story ? m.story.author_id === meId : !mine;
+  const label = !m.story
+    ? "Story sudah hilang"
+    : mine
+      ? storyOfMe
+        ? "Dari story kamu"
+        : `Membalas story ${partnerName}`
+      : storyOfMe
+        ? "Membalas story kamu"
+        : `Dari story ${partnerName}`;
+  return (
+    <div className={`flex items-center gap-2 ${mine ? "flex-row-reverse" : ""}`}>
+      <span className="relative h-16 w-11 shrink-0 overflow-hidden rounded-[10px] bg-tint shadow-soft">
+        {m.storyUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={m.storyUrl} alt="" className="size-full object-cover" />
+        ) : (
+          <span className="flex size-full items-center justify-center text-lg">📸</span>
+        )}
+      </span>
+      <span className="text-[12px] font-bold text-muted">{label}</span>
+    </div>
+  );
 }
 
 /** Kotak kutipan pesan yang dibalas. Diketuk → lompat ke pesan aslinya. */
@@ -81,11 +107,13 @@ function MessageRow({
   flash,
   menuOpen,
   partnerName,
+  meId,
   onReply,
   onJump,
   onMenu,
   onOpenPhoto,
 }: {
+  meId: string;
   m: ChatMessage;
   mine: boolean;
   quote: { reply: ReplyRef | null } | null;
@@ -167,8 +195,14 @@ function MessageRow({
         className={`flex max-w-full flex-col gap-1 ${mine ? "items-end" : "items-start"}`}
         style={{ transform: dx ? `translateX(${dx}px)` : undefined, transition: dx ? "none" : "transform .2s ease" }}
       >
+        {m.story_id || m.story ? <StoryQuote m={m} mine={mine} meId={meId} partnerName={partnerName} /> : null}
         <div className={`flex max-w-full items-center gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
-          {m.kind === "text" ? (
+          {m.kind === "voice" ? (
+            <div className={`flex flex-col gap-1.5 px-3 py-2 shadow-[0_3px_10px_rgba(11,37,69,0.05)] ${bubble}`}>
+              {quote && <Quote reply={quote.reply} who={quoteWho} mine={mine} inBubble onJump={jump} />}
+              <VoiceBubble id={m.id} src={m.fullUrl ?? m.url} durationMs={m.duration_ms} mine={mine} />
+            </div>
+          ) : m.kind === "text" ? (
             <div className={`flex max-w-[78vw] flex-col gap-1.5 px-4 py-2.5 shadow-[0_3px_10px_rgba(11,37,69,0.05)] sm:max-w-[420px] lg:max-w-[520px] ${bubble} ${quote ? "pt-2" : ""}`}>
               {quote && <Quote reply={quote.reply} who={quoteWho} mine={mine} inBubble onJump={jump} />}
               <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap select-none [@media(hover:hover)]:select-text">{m.body}</p>
@@ -315,7 +349,8 @@ export function ChatView({
   const [error, setError] = useState<string>();
   const [, startTransition] = useTransition();
   const listRef = useRef<HTMLDivElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [camOpen, setCamOpen] = useState(false);
+  const [rec, setRec] = useState({ recording: false, locked: false, ms: 0, cancelHint: 0 });
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSent = useRef(0);
   const stickToBottom = useRef(true);
@@ -367,7 +402,9 @@ export function ChatView({
     setMessages((prev) => {
       const without = prev.filter((x) => x.id !== m.id && x.id !== tempId);
       const existing = prev.find((x) => x.id === m.id);
-      const merged = existing ? { ...existing, ...m, url: m.url ?? existing.url, fullUrl: m.fullUrl ?? existing.fullUrl } : m;
+      const merged = existing
+        ? { ...existing, ...m, url: m.url ?? existing.url, fullUrl: m.fullUrl ?? existing.fullUrl, story: m.story ?? existing.story, storyUrl: m.storyUrl ?? existing.storyUrl }
+        : m;
       return [...without, merged].sort((a, b) => a.created_at.localeCompare(b.created_at));
     });
   }, []);
@@ -375,12 +412,30 @@ export function ChatView({
   // Foto yang datang lewat realtime belum punya URL: minta URL sementara.
   const resolveUrl = useCallback(
     async (m: ChatMessage) => {
-      if (!m.media_path || m.url) return;
-      const paths = [m.thumb_path, m.media_path].filter((p): p is string => Boolean(p));
-      const { data } = await createClient().storage.from("gallery").createSignedUrls(paths, 3600);
-      const map = Object.fromEntries((data ?? []).map((d) => [d.path, d.signedUrl]));
-      const full = map[m.media_path];
-      if (full) upsert({ ...m, url: (m.thumb_path && map[m.thumb_path]) || full, fullUrl: full });
+      const supabase = createClient();
+      let story = m.story ?? null;
+      if (m.story_id && !story) {
+        const { data } = await supabase.from("stories").select("id, author_id, thumb_path").eq("id", m.story_id).maybeSingle();
+        story = data ?? null;
+      }
+      const needMedia = Boolean(m.media_path && !m.url);
+      const needStory = Boolean(story?.thumb_path && !m.storyUrl);
+      if (!needMedia && !needStory && story === (m.story ?? null)) return;
+      const paths = [needMedia ? m.thumb_path : null, needMedia ? m.media_path : null, needStory ? story?.thumb_path : null].filter(
+        (p): p is string => Boolean(p),
+      );
+      const map: Record<string, string> = {};
+      if (paths.length) {
+        const { data } = await supabase.storage.from("gallery").createSignedUrls(paths, 3600);
+        for (const d of data ?? []) if (d.path && d.signedUrl) map[d.path] = d.signedUrl;
+      }
+      const next: ChatMessage = { ...m, story };
+      if (needMedia && m.media_path && map[m.media_path]) {
+        next.url = (m.thumb_path && map[m.thumb_path]) || map[m.media_path];
+        next.fullUrl = map[m.media_path];
+      }
+      if (needStory && story?.thumb_path && map[story.thumb_path]) next.storyUrl = map[story.thumb_path];
+      upsert(next);
     },
     [upsert],
   );
@@ -445,7 +500,14 @@ export function ChatView({
     broadcast("chat", "typing", { user: me.id });
   }
 
-  function send(kind: ChatMessage["kind"], body: string | null, mediaPath: string | null = null, localUrl?: string, thumbPath: string | null = null) {
+  function send(
+    kind: ChatMessage["kind"],
+    body: string | null,
+    mediaPath: string | null = null,
+    localUrl?: string,
+    thumbPath: string | null = null,
+    extra: { durationMs?: number } = {},
+  ) {
     setError(undefined);
     stickToBottom.current = true;
     play(kind === "heart" ? "pop" : "send");
@@ -466,9 +528,11 @@ export function ChatView({
       created_at: new Date().toISOString(),
       read_at: null,
       url: localUrl,
+      fullUrl: localUrl,
+      duration_ms: extra.durationMs ?? null,
     });
     startTransition(async () => {
-      const res = await attempt(() => sendMessage({ kind, body, mediaPath, thumbPath, replyTo: replying?.id ?? null }));
+      const res = await attempt(() => sendMessage({ kind, body, mediaPath, thumbPath, replyTo: replying?.id ?? null, durationMs: extra.durationMs ?? null }));
       if ("error" in res && res.error || !("message" in res) || !res.message) {
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
         setError(("error" in res && res.error) || "Pesan gagal terkirim.");
@@ -477,7 +541,8 @@ export function ChatView({
         if (kind === "text" && body) setDraft((d) => d || body);
         if (replying) setReplyTo((r) => r ?? replying);
       } else {
-        upsert(res.message, tempId);
+        // URL lokal tetap dipakai supaya foto/suara tidak berkedip saat diganti versi server
+        upsert({ ...res.message, url: res.message.url ?? localUrl, fullUrl: res.message.fullUrl ?? localUrl }, tempId);
       }
     });
   }
@@ -490,14 +555,19 @@ export function ChatView({
     send("text", text);
   }
 
-  function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
+  function onPhoto(file: Blob) {
     startTransition(async () => {
       const up = await uploadPhoto(createClient(), file, `${coupleId}/chat`).catch(() => ({ error: OFFLINE }));
       if ("error" in up) return setError(`Foto gagal diunggah: ${up.error}`);
       send("photo", null, up.path, up.localUrl, up.thumbPath);
+    });
+  }
+
+  function onVoice(clip: VoiceClip) {
+    startTransition(async () => {
+      const up = await uploadVoice(createClient(), clip.blob, `${coupleId}/chat/voice`, clip.ext, clip.mime).catch(() => ({ error: OFFLINE }));
+      if ("error" in up) return setError(`Voice note gagal diunggah: ${up.error}`);
+      send("voice", null, up.path, up.localUrl, null, { durationMs: clip.durationMs });
     });
   }
 
@@ -578,6 +648,7 @@ export function ChatView({
                 flash={flashId === m.id}
                 menuOpen={menuFor === m.id}
                 partnerName={partnerName}
+                meId={me.id}
                 onReply={startReply}
                 onJump={jumpTo}
                 onMenu={setMenuFor}
@@ -625,39 +696,54 @@ export function ChatView({
           </button>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => fileRef.current?.click()} aria-label="Kirim foto" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-sky">
-            <Icon name="camera" size={20} />
-          </button>
-          <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={onPhoto} aria-label="Pilih foto" />
-          <label htmlFor="pesan" className="sr-only">Tulis pesan</label>
-          <input
-            ref={inputRef}
-            id="pesan"
-            value={draft}
-            onChange={(e) => {
-              setDraft(e.target.value);
-              notifyTyping();
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") setReplyTo(null);
-            }}
-            placeholder={replyTo ? "Tulis balasan…" : "Tulis pesan…"}
-            autoComplete="off"
-            className="h-[46px] min-w-0 flex-1 rounded-full border-2 border-tint bg-sky px-4 text-base focus:border-ocean focus:outline-none"
-          />
-          <button type="button" onClick={(e) => {
-              const { x, y } = centerOf(e.currentTarget);
-              burstHearts(x, y, 12);
-              send("heart", null);
-            }} aria-label="Kirim hati" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-pink-soft">
-            <Heart size={22} beat={false} />
-          </button>
-          <button type="submit" aria-label="Kirim" className="flex size-[46px] shrink-0 items-center justify-center rounded-full bg-ocean text-white shadow-ocean">
-            <Icon name="send" size={20} />
-          </button>
+          {rec.recording ? (
+            <RecordingBar ms={rec.ms} locked={rec.locked} cancelHint={rec.cancelHint} />
+          ) : (
+            <>
+              <button type="button" onClick={() => setCamOpen(true)} aria-label="Pap dari kamera" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-sky">
+                <Icon name="camera" size={20} />
+              </button>
+              <label htmlFor="pesan" className="sr-only">Tulis pesan</label>
+              <input
+                ref={inputRef}
+                id="pesan"
+                value={draft}
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  notifyTyping();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setReplyTo(null);
+                }}
+                placeholder={replyTo ? "Tulis balasan…" : "Tulis pesan…"}
+                autoComplete="off"
+                className="h-[46px] min-w-0 flex-1 rounded-full border-2 border-tint bg-sky px-4 text-base focus:border-ocean focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={(e) => {
+                  const { x, y } = centerOf(e.currentTarget);
+                  burstHearts(x, y, 12);
+                  send("heart", null);
+                }}
+                aria-label="Kirim hati"
+                className="flex size-11 shrink-0 items-center justify-center rounded-full bg-pink-soft"
+              >
+                <Heart size={22} beat={false} />
+              </button>
+            </>
+          )}
+          {draft.trim() && !rec.recording ? (
+            <button type="submit" aria-label="Kirim" className="flex size-[46px] shrink-0 items-center justify-center rounded-full bg-ocean text-white shadow-ocean">
+              <Icon name="send" size={20} />
+            </button>
+          ) : (
+            <VoiceButton onRecorded={onVoice} onState={setRec} onError={(msg) => setError(msg)} />
+          )}
         </div>
       </form>
       {viewing && <PhotoViewer message={viewing} onClose={() => setViewing(null)} />}
+      <CameraCapture open={camOpen} onClose={() => setCamOpen(false)} onPick={onPhoto} confirmLabel="Kirim pap" />
     </div>
   );
 }

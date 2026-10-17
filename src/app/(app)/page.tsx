@@ -10,6 +10,8 @@ import { AppBar, Avatar, Bubbles, Page, PageSkeleton, ThemeArt } from "@/compone
 import { PetCats } from "@/components/pet-cats";
 import { LoveHeart } from "@/components/love-heart";
 import { SweetCard } from "@/components/sweet-card";
+import { StoryBar } from "@/components/story/story-bar";
+import { loadStoryFeed } from "@/lib/stories-server";
 import { NudgeBar } from "@/components/nudge-bar";
 import { PartnerStatus } from "@/components/partner-status";
 import { Celebrate } from "@/components/celebrate";
@@ -57,10 +59,40 @@ async function RecentPhotos({ photos }: { photos: DashboardData["photos"] }) {
   );
 }
 
+/** "Hari ini, tahun lalu…": muncul hanya kalau ada foto di tanggal yang sama tahun-tahun sebelumnya. */
+async function OnThisDay() {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("on_this_day");
+  const photos = (data ?? []) as DashboardData["photos"];
+  if (!photos.length) return null;
+  const urls = await signedUrls(supabase, photos.map((p) => p.thumb_path ?? p.storage_path));
+  const years = new Date().getFullYear() - new Date(photos[0].created_at).getFullYear();
+  return (
+    <Link href="/timeline" className="tap relative flex animate-rise flex-col gap-3 overflow-hidden rounded-[26px] bg-sand-soft p-5 text-sand-ink">
+      <span className="flex items-center gap-2 font-display text-lg font-semibold text-navy">
+        <span style={{ animation: "wiggle 2.6s ease-in-out infinite" }}>🕰️</span> Hari ini, {years > 1 ? `${years} tahun` : "setahun"} lalu…
+      </span>
+      <div className="scroll-row flex gap-2">
+        {photos.map((p, i) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={p.id}
+            src={urls[p.thumb_path ?? p.storage_path]}
+            alt=""
+            className="size-24 shrink-0 rounded-2xl bg-white object-cover shadow-soft"
+            style={{ transform: `rotate(${i % 2 ? 3 : -3}deg)`, animation: `pop-in .4s ease ${i * 0.08}s both` }}
+          />
+        ))}
+      </div>
+      <span className="text-[13px] font-bold">Lihat Timeline kalian →</span>
+    </Link>
+  );
+}
+
 async function Dashboard() {
   const supabase = await createClient();
   // Data akun & isi Beranda diambil bersamaan (keamanan dijaga RLS di database).
-  const [viewer, { data }] = await Promise.all([requireCouple(), supabase.rpc("dashboard_data")]);
+  const [viewer, { data }, feed] = await Promise.all([requireCouple(), supabase.rpc("dashboard_data"), loadStoryFeed(supabase)]);
   const d = (data ?? { next_meeting: null, open_issues: 0, unread: 0, photos: [], love: null }) as DashboardData;
   const now = new Date();
 
@@ -103,6 +135,13 @@ async function Dashboard() {
           )}
         </Link>
       </AppBar>
+
+      <StoryBar
+        feed={feed}
+        coupleId={viewer.couple.id}
+        me={{ id: viewer.userId, name: viewer.profile.display_name, avatar: viewer.profile.avatar_url }}
+        partner={viewer.partner ? { id: viewer.partner.id, name: viewer.partner.display_name, avatar: viewer.partner.avatar_url } : null}
+      />
 
       {special && (
         <div className="flex animate-rise items-center gap-3 rounded-[22px] bg-pink-soft px-4 py-3 text-[15px] font-bold text-[#9b1c3a]">
@@ -284,6 +323,10 @@ async function Dashboard() {
         </Link>
       </div>
 
+      <Suspense fallback={null}>
+        <OnThisDay />
+      </Suspense>
+
       <section className="card flex animate-rise flex-col gap-4 p-5">
         <div className="flex items-baseline justify-between">
           <h2 className="font-display text-xl font-medium">Kenangan terbaru</h2>
@@ -300,7 +343,7 @@ async function Dashboard() {
 export default function HomePage() {
   return (
     <Page>
-      <LiveRefresh kinds={["meeting", "meeting_deleted", "photo", "issue", "issue_response", "issue_resolved", "mood"]} />
+      <LiveRefresh kinds={["meeting", "meeting_deleted", "photo", "issue", "issue_response", "issue_resolved", "mood", "story", "story_deleted", "story_view", "highlight"]} />
       <Suspense fallback={<div className="pt-[max(calc(env(safe-area-inset-top)+16px),24px)]"><PageSkeleton /></div>}>
         <Dashboard />
       </Suspense>

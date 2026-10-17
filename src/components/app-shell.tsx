@@ -22,6 +22,7 @@ const SIDEBAR: NavItem[] = [
   { href: "/ide", label: "Ide Kencan", icon: "sparkle" },
   { href: "/ruang-bicara", label: "Ruang Bicara", icon: "talk" },
   { href: "/galeri", label: "Galeri", icon: "image" },
+  { href: "/timeline", label: "Timeline", icon: "book" },
   { href: "/main", label: "Main Bareng", icon: "game" },
   { href: "/tema", label: "Tema", icon: "palette" },
   { href: "/akun", label: "Akun", icon: "user" },

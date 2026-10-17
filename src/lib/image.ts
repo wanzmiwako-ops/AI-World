@@ -34,7 +34,7 @@ export function randomId() {
  * - foto penuh (maks. 1600 px) untuk dibuka
  * - thumbnail (maks. 480 px, ±30 KB) untuk grid & chat, supaya halaman ringan
  */
-export async function uploadPhoto(supabase: SupabaseClient, file: File, folder: string) {
+export async function uploadPhoto(supabase: SupabaseClient, file: Blob, folder: string) {
   const id = randomId();
   const path = `${folder}/${id}.webp`;
   const thumbPath = `${folder}/${id}_t.webp`;
@@ -44,4 +44,12 @@ export async function uploadPhoto(supabase: SupabaseClient, file: File, folder: 
   const [a, b] = await Promise.all([bucket.upload(path, full, opts), bucket.upload(thumbPath, thumb, opts)]);
   if (a.error) return { error: a.error.message };
   return { path, thumbPath: b.error ? null : thumbPath, localUrl: URL.createObjectURL(thumb) };
+}
+
+/** Unggah rekaman suara (voice note) ke folder privat kalian. */
+export async function uploadVoice(supabase: SupabaseClient, blob: Blob, folder: string, ext: string, mime: string) {
+  const path = `${folder}/${randomId()}.${ext}`;
+  const { error } = await supabase.storage.from("gallery").upload(path, blob, { contentType: mime, cacheControl: "31536000" });
+  if (error) return { error: error.message };
+  return { path, localUrl: URL.createObjectURL(blob) };
 }

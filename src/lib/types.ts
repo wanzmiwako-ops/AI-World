@@ -72,11 +72,13 @@ export type Message = {
   id: string;
   couple_id: string;
   sender_id: string;
-  kind: "text" | "heart" | "photo" | "sticker";
+  kind: "text" | "heart" | "photo" | "sticker" | "voice";
   body: string | null;
   media_path: string | null;
   thumb_path?: string | null;
   reply_to?: string | null;
+  duration_ms?: number | null;
+  story_id?: string | null;
   created_at: string;
   read_at: string | null;
 };
