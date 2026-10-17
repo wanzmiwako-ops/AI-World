@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/icon";
 import { haptic, play } from "@/lib/feel";
+import { isNativeApp } from "@/lib/native";
 
 export const MAX_VOICE_MS = 120_000;
 
@@ -89,7 +90,13 @@ export function VoiceButton({
       s = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
     } catch (e) {
       const name = (e as DOMException)?.name;
-      onError(name === "NotAllowedError" ? "Izin mikrofon belum diberikan. Aktifkan di pengaturan HP, ya." : "Mikrofon tidak bisa dipakai.");
+      onError(
+        name === "NotAllowedError" || name === "SecurityError"
+          ? isNativeApp()
+            ? "Mikrofon belum diizinkan. Buka Pengaturan HP → Aplikasi → A&I WORLD → Izin → Mikrofon → Izinkan. Kalau pilihan Mikrofon tidak ada, pasang APK versi terbaru dulu."
+            : "Izin mikrofon belum diberikan. Ketuk ikon gembok di samping alamat web → izinkan Mikrofon."
+          : "Mikrofon tidak bisa dipakai. Coba tutup aplikasi lain yang sedang memakai mikrofon.",
+      );
       return;
     }
     // Jari sudah dilepas saat izin muncul → jangan langsung merekam

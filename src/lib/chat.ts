@@ -7,6 +7,7 @@ export function kindPreview(kind: string, body: string | null | undefined, max =
   if (kind === "heart") return "Mengirim hati ❤";
   if (kind === "sticker") return "🐱 Stiker kucing";
   if (kind === "voice") return "🎤 Voice note";
+  if (kind === "location") return `📍 ${(body ?? "Lokasi").slice(0, max - 3)}`;
   const text = (body ?? "").trim();
   return text.length > max ? `${text.slice(0, max - 3)}…` : text;
 }

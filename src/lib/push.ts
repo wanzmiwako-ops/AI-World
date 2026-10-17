@@ -93,6 +93,7 @@ export function messagePreview(kind: string, body: string | null) {
   if (kind === "heart") return "Mengirim hati ❤";
   if (kind === "sticker") return "Mengirim stiker kucing";
   if (kind === "voice") return "🎤 Mengirim voice note";
+  if (kind === "location") return `📍 Lagi di ${body ?? "sini"}`;
   const text = (body ?? "").trim();
   return text.length > 120 ? `${text.slice(0, 117)}…` : text;
 }

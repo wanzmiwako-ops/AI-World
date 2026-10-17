@@ -169,7 +169,7 @@ export function StoryBar({ feed, me, partner, coupleId }: { feed: StoryFeed; me:
           onSeen={onSeen}
         />
       )}
-      <StoryComposer open={composer} onClose={() => setComposer(false)} coupleId={coupleId} partnerName={partner?.name ?? "pasanganmu"} />
+      <StoryComposer open={composer} onClose={() => setComposer(false)} coupleId={coupleId} partnerName={partner?.name ?? "pasanganmu"} partnerId={partner?.id ?? null} />
     </>
   );
 }

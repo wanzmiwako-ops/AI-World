@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@/components/icon";
@@ -8,6 +9,7 @@ import { Avatar } from "@/components/ui";
 import { attempt } from "@/lib/offline";
 import { burstHearts, centerOf, haptic, play } from "@/lib/feel";
 import { STORY_REACTIONS, timeAgo, type Highlight, type Story } from "@/lib/stories";
+import { mapsUrl } from "@/lib/geo";
 import { createHighlight, deleteHighlight, deleteStory, replyStory, seeStory, setStoryHighlight } from "@/app/(app)/story-actions";
 
 const DURATION = 6;
@@ -263,6 +265,30 @@ export function StoryViewer({
               <Icon name="close" size={20} />
             </button>
           </div>
+          {(story.location || story.hashtags?.length || story.mentions?.length) && (
+            <div className="pointer-events-auto flex flex-wrap gap-1.5" style={{ animation: "pop-in .35s ease both" }}>
+              {story.location && (
+                <a
+                  href={mapsUrl(story.location)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex max-w-full items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-navy"
+                >
+                  📍 <span className="truncate">{story.location.name}</span> <span className="opacity-60">↗</span>
+                </a>
+              )}
+              {story.mentions?.map((id) => (
+                <span key={id} className="rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-ocean">
+                  🏷️ {id === me.id ? "kamu" : (partner?.name ?? "pasangan")}
+                </span>
+              ))}
+              {story.hashtags?.map((t) => (
+                <Link key={t} href={`/timeline?tag=${encodeURIComponent(t)}`} onClick={onClose} className="rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-pink">
+                  #{t}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
         {note && (

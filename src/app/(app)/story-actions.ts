@@ -7,26 +7,48 @@ import { requireCouple } from "@/lib/dal";
 import { notifyPartner } from "@/lib/push";
 import { sendMessage } from "@/app/(app)/chat/actions";
 import { STORY_REACTIONS } from "@/lib/stories";
+import { cleanPlace, cleanTag, type Place } from "@/lib/geo";
 
 const UUID = /^[0-9a-f-]{36}$/i;
 
-export async function createStory(input: { mediaPath: string; thumbPath: string | null }) {
+export async function createStory(input: {
+  mediaPath: string;
+  thumbPath: string | null;
+  mentions?: string[];
+  hashtags?: string[];
+  location?: Place | null;
+}) {
   const viewer = await requireCouple();
   const prefix = `${viewer.couple.id}/stories/`;
   if (!input.mediaPath?.startsWith(prefix) || (input.thumbPath && !input.thumbPath.startsWith(prefix))) {
     return { error: "Lokasi foto tidak valid." };
   }
+  const tagged = Boolean(viewer.partner && input.mentions?.includes(viewer.partner.id));
+  const hashtags = [...new Set((input.hashtags ?? []).map(cleanTag).filter(Boolean))].slice(0, 10);
+  const location = cleanPlace(input.location);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("stories")
-    .insert({ couple_id: viewer.couple.id, author_id: viewer.userId, media_path: input.mediaPath, thumb_path: input.thumbPath })
+    .insert({
+      couple_id: viewer.couple.id,
+      author_id: viewer.userId,
+      media_path: input.mediaPath,
+      thumb_path: input.thumbPath,
+      mentions: tagged && viewer.partner ? [viewer.partner.id] : [],
+      hashtags,
+      location,
+    })
     .select("id")
     .single();
   if (error) return { error: error.message };
   after(() =>
     notifyPartner(supabase, {
       title: viewer.profile.display_name,
-      body: "Bikin story baru 👀 Lihat yuk!",
+      body: tagged
+        ? `Menandai kamu di story 🏷️${location ? ` · 📍 ${location.name}` : ""}`
+        : location
+          ? `Bikin story di 📍 ${location.name} 👀`
+          : "Bikin story baru 👀 Lihat yuk!",
       url: "/",
       tag: "story",
     }),

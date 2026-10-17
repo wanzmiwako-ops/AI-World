@@ -1,3 +1,5 @@
+import type { Place } from "@/lib/geo";
+
 /** Data Story & Sorotan (dipakai di server dan di HP). */
 export type StoryView = { user_id: string; reaction: string | null; viewed_at: string };
 
@@ -10,6 +12,9 @@ export type Story = {
   created_at: string;
   expires_at: string;
   views: StoryView[];
+  mentions?: string[];
+  hashtags?: string[];
+  location?: Place | null;
   url?: string;
   thumbUrl?: string;
 };

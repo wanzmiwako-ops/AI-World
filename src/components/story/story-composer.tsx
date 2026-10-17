@@ -9,15 +9,19 @@ import { randomId } from "@/lib/image";
 import { attempt, OFFLINE } from "@/lib/offline";
 import { haptic, play, rainHearts } from "@/lib/feel";
 import { createStory } from "@/app/(app)/story-actions";
+import { LocationPicker } from "@/components/location-picker";
+import { cleanTag, hashtagsIn, TAG_IDEAS, type Place } from "@/lib/geo";
 
 const W = 1080;
 const H = 1920;
 
 type Item = {
   id: string;
-  type: "text" | "sticker" | "word";
+  type: "text" | "sticker" | "word" | "mention" | "hashtag" | "location";
   text: string;
-  color: string;
+  color: string; // warna latar (pill) atau warna teks
+  fg?: string; // warna teks di dalam pill
+  place?: Place;
   pill: boolean;
   x: number; // 0..1 dari lebar panggung
   y: number; // 0..1 dari tinggi panggung
@@ -44,7 +48,8 @@ const SOURCES = [
   { key: "text", label: "Teks", emoji: "Aa" },
 ] as const;
 
-const BASE: Record<Item["type"], number> = { text: 0.075, sticker: 0.17, word: 0.06 };
+const BASE: Record<Item["type"], number> = { text: 0.075, sticker: 0.17, word: 0.06, mention: 0.064, hashtag: 0.064, location: 0.056 };
+const TAGGY: Item["type"][] = ["mention", "hashtag", "location"];
 
 function cssVar(v: string) {
   if (!v.startsWith("--")) return v;
@@ -101,7 +106,7 @@ function drawItem(ctx: CanvasRenderingContext2D, it: Item, font: string) {
     ctx.beginPath();
     ctx.roundRect(-bw / 2 - padX, top - lh / 2 - padY + size * 0.08, bw + padX * 2, lh * lines.length + padY * 2 - size * 0.16, size * 0.55);
     ctx.fill();
-    ctx.fillStyle = readable(it.color);
+    ctx.fillStyle = it.fg ?? readable(it.color);
   } else {
     ctx.fillStyle = it.color;
     if (it.type !== "sticker") {
@@ -123,7 +128,19 @@ async function loadImage(src: string) {
 
 type Step = "pick" | "edit";
 
-export function StoryComposer({ open, onClose, coupleId, partnerName }: { open: boolean; onClose: () => void; coupleId: string; partnerName: string }) {
+export function StoryComposer({
+  open,
+  onClose,
+  coupleId,
+  partnerName,
+  partnerId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  coupleId: string;
+  partnerName: string;
+  partnerId: string | null;
+}) {
   const [step, setStep] = useState<Step>("pick");
   const [camOpen, setCamOpen] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
@@ -134,6 +151,8 @@ export function StoryComposer({ open, onClose, coupleId, partnerName }: { open: 
   const [penColor, setPenColor] = useState(COLORS[2]);
   const [editing, setEditing] = useState<Item | null>(null);
   const [stickersOpen, setStickersOpen] = useState(false);
+  const [hashOpen, setHashOpen] = useState(false);
+  const [locOpen, setLocOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overTrash, setOverTrash] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -213,11 +232,11 @@ export function StoryComposer({ open, onClose, coupleId, partnerName }: { open: 
     setStep("edit");
   }
 
-  function addItem(type: Item["type"], text: string, color = "#FFFFFF", pill = false) {
+  function addItem(type: Item["type"], text: string, color = "#FFFFFF", pill = false, fg?: string, place?: Place) {
     const n = items.length;
     const spots = [[0.5, 0.42], [0.3, 0.26], [0.7, 0.66], [0.68, 0.24], [0.32, 0.7], [0.5, 0.82]];
     const [x, y] = type === "text" ? [0.5, 0.5] : spots[n % spots.length];
-    const it: Item = { id: randomId(), type, text, color, pill, x, y, scale: 1, rot: (Math.random() - 0.5) * (type === "text" ? 0 : 0.3) };
+    const it: Item = { id: randomId(), type, text, color, fg, place, pill, x, y, scale: 1, rot: (Math.random() - 0.5) * (type === "text" || TAGGY.includes(type) ? 0.08 : 0.3) };
     setItems((l) => [...l, it]);
     setActiveId(it.id);
     play("pop");
@@ -315,6 +334,10 @@ export function StoryComposer({ open, onClose, coupleId, partnerName }: { open: 
       play("error");
     } else if (!g.moved && Date.now() - g.t0 < 300 && it && it.type === "text") {
       setEditing(it);
+    } else if (!g.moved && Date.now() - g.t0 < 300 && it && TAGGY.includes(it.type)) {
+      // ketuk stiker tag/hashtag/lokasi → tukar gaya (putih ↔ berwarna)
+      setItems((l) => l.map((i) => (i.id === it.id ? { ...i, color: i.fg ?? "#FFFFFF", fg: i.color } : i)));
+      play("tap");
     }
     gesture.current = null;
     setOverTrash(false);
@@ -370,7 +393,16 @@ export function StoryComposer({ open, onClose, coupleId, partnerName }: { open: 
       const opts = { contentType: "image/webp", cacheControl: "31536000" };
       const up = await Promise.all([bucket.upload(path, out.full, opts), bucket.upload(thumbPath, out.thumb, opts)]).catch(() => null);
       if (!up || up[0].error) return setError(up?.[0].error?.message ?? OFFLINE);
-      const res = await attempt(() => createStory({ mediaPath: path, thumbPath: up[1].error ? null : thumbPath }));
+      const tags = [
+        ...items.filter((i) => i.type === "hashtag").map((i) => cleanTag(i.text)),
+        ...items.filter((i) => i.type === "text" || i.type === "word").flatMap((i) => hashtagsIn(i.text)),
+      ].filter(Boolean);
+      const meta = {
+        mentions: partnerId && items.some((i) => i.type === "mention") ? [partnerId] : [],
+        hashtags: [...new Set(tags)].slice(0, 10),
+        location: items.find((i) => i.type === "location")?.place ?? null,
+      };
+      const res = await attempt(() => createStory({ mediaPath: path, thumbPath: up[1].error ? null : thumbPath, ...meta }));
       if ("error" in res && res.error) {
         play("error");
         return setError(res.error);
@@ -455,7 +487,7 @@ export function StoryComposer({ open, onClose, coupleId, partnerName }: { open: 
                       left: `${it.x * 100}%`,
                       top: `${it.y * 100}%`,
                       fontSize: size,
-                      color: pill ? readable(it.color) : it.color,
+                      color: pill ? (it.fg ?? readable(it.color)) : it.color,
                       background: pill ? it.color : undefined,
                       padding: pill ? `${size * 0.2}px ${size * 0.45}px` : undefined,
                       borderRadius: pill ? size * 0.55 : undefined,
@@ -588,6 +620,42 @@ export function StoryComposer({ open, onClose, coupleId, partnerName }: { open: 
                 onClick={(e) => e.stopPropagation()}
               >
                 <span className="mx-auto h-1.5 w-12 rounded-full bg-white/25" />
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    disabled={!partnerId}
+                    onClick={() => {
+                      setStickersOpen(false);
+                      addItem("mention", `@${partnerName}`, "#FFFFFF", true, cssVar("--color-ocean"));
+                    }}
+                    className="flex flex-col items-center gap-1 rounded-[18px] bg-white py-3 font-display font-semibold text-ocean disabled:opacity-40"
+                  >
+                    <span className="text-2xl leading-none">@</span>
+                    <span className="max-w-full truncate px-1 text-xs">Tag {partnerName}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStickersOpen(false);
+                      setHashOpen(true);
+                    }}
+                    className="flex flex-col items-center gap-1 rounded-[18px] bg-white py-3 font-display font-semibold text-pink"
+                  >
+                    <span className="text-2xl leading-none">#</span>
+                    <span className="text-xs">Hashtag</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStickersOpen(false);
+                      setLocOpen(true);
+                    }}
+                    className="flex flex-col items-center gap-1 rounded-[18px] bg-white py-3 font-display font-semibold text-navy"
+                  >
+                    <span className="text-2xl leading-none">📍</span>
+                    <span className="text-xs">Lokasi</span>
+                  </button>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {WORDS.map((w, i) => (
                     <button
@@ -636,6 +704,23 @@ export function StoryComposer({ open, onClose, coupleId, partnerName }: { open: 
         </>
       )}
       <CameraCapture open={camOpen} onClose={() => setCamOpen(false)} onPick={choosePhoto} confirmLabel="Lanjut" />
+      <LocationPicker
+        open={locOpen}
+        onClose={() => setLocOpen(false)}
+        onPick={(place) => {
+          setItems((l) => l.filter((i) => i.type !== "location")); // satu lokasi per story
+          addItem("location", `📍 ${place.name}`, "#FFFFFF", true, "#0B2545", place);
+        }}
+      />
+      {hashOpen && (
+        <HashtagEditor
+          onCancel={() => setHashOpen(false)}
+          onDone={(tag) => {
+            setHashOpen(false);
+            if (tag) addItem("hashtag", `#${tag}`, "#FFFFFF", true, cssVar("--color-pink"));
+          }}
+        />
+      )}
     </div>,
     document.body,
   );
@@ -694,6 +779,54 @@ function TextEditor({ initial, onDone, onCancel }: { initial: Item; onDone: (it:
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+function HashtagEditor({ onDone, onCancel }: { onDone: (tag: string) => void; onCancel: () => void }) {
+  const [text, setText] = useState("");
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    ref.current?.focus();
+  }, []);
+  const tag = cleanTag(text);
+  return (
+    <div className="absolute inset-0 z-20 flex flex-col bg-black/70" style={{ paddingTop: "max(env(safe-area-inset-top), 12px)" }}>
+      <div className="flex items-center justify-between p-3">
+        <button type="button" onClick={onCancel} className="h-10 rounded-full px-3 font-bold">
+          Batal
+        </button>
+        <button type="button" onClick={() => onDone(tag)} disabled={!tag} className="h-10 rounded-full bg-white px-4 font-bold text-navy disabled:opacity-50">
+          Selesai
+        </button>
+      </div>
+      <form
+        className="flex flex-1 flex-col items-center justify-center gap-5 px-6"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onDone(tag);
+        }}
+      >
+        <label className="flex items-center rounded-full bg-white px-5 py-2 font-display text-[28px] font-semibold text-pink">
+          #
+          <input
+            ref={ref}
+            value={text}
+            onChange={(e) => setText(e.target.value.replace(/\s+/g, "_"))}
+            maxLength={40}
+            placeholder="hashtag"
+            aria-label="Hashtag"
+            className="w-48 bg-transparent outline-none placeholder:text-pink/40"
+          />
+        </label>
+        <div className="flex flex-wrap justify-center gap-2">
+          {TAG_IDEAS.map((t) => (
+            <button key={t} type="button" onClick={() => onDone(t)} className="rounded-full bg-white/15 px-3 py-1.5 text-sm font-bold">
+              #{t}
+            </button>
+          ))}
+        </div>
+      </form>
     </div>
   );
 }

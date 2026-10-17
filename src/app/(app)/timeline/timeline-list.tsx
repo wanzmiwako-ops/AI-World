@@ -30,7 +30,7 @@ const dayFmt = new Intl.DateTimeFormat("id-ID", { weekday: "short", day: "numeri
 
 const DOT: Record<TimelineEvent["kind"], string> = { ketemu: "bg-aqua-soft", foto: "bg-tint", momen: "bg-pink-soft" };
 
-export function TimelineList({ events }: { events: TimelineEvent[] }) {
+export function TimelineList({ events, plain = false }: { events: TimelineEvent[]; plain?: boolean }) {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("semua");
   const [limit, setLimit] = useState(30);
   const list = filter === "semua" ? events : events.filter((e) => e.kind === filter);
@@ -38,7 +38,7 @@ export function TimelineList({ events }: { events: TimelineEvent[] }) {
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="scroll-row flex gap-2">
+      <div className={`scroll-row flex gap-2 ${plain ? "hidden" : ""}`}>
         {FILTERS.map((f) => (
           <button
             key={f.id}
@@ -101,7 +101,11 @@ export function TimelineList({ events }: { events: TimelineEvent[] }) {
                   >
                     {e.emoji}
                   </span>
-                  {e.href ? (
+                  {e.href?.startsWith("http") ? (
+                    <a href={e.href} target="_blank" rel="noopener noreferrer" className={`tap ${card}`}>
+                      {body}
+                    </a>
+                  ) : e.href ? (
                     <Link href={e.href} className={`tap ${card}`}>
                       {body}
                     </Link>
@@ -112,7 +116,7 @@ export function TimelineList({ events }: { events: TimelineEvent[] }) {
               </li>
             );
           })}
-          {shown.length === list.length && filter === "semua" && (
+          {shown.length === list.length && filter === "semua" && !plain && (
             <li className="relative flex items-center gap-3 pt-2">
               <span className="absolute -left-11">
                 <Cat variant="mochi" size={44} mood="love" motion="bob" />

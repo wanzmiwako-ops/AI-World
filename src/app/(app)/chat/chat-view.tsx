@@ -14,6 +14,9 @@ import { attempt, OFFLINE } from "@/lib/offline";
 import { kindPreview, MESSAGE_COLS } from "@/lib/chat";
 import { CameraCapture } from "@/components/camera-capture";
 import { RecordingBar, VoiceBubble, VoiceButton, type VoiceClip } from "@/components/voice";
+import { LocationPicker } from "@/components/location-picker";
+import { MapPreview } from "@/components/map-preview";
+import { HASHTAG_RE, mapsUrl, type Place } from "@/lib/geo";
 
 type Person = { id: string; name: string; avatar: string | null };
 
@@ -60,6 +63,51 @@ function StoryQuote({ m, mine, meId, partnerName }: { m: ChatMessage; mine: bool
       </span>
       <span className="text-[12px] font-bold text-muted">{label}</span>
     </div>
+  );
+}
+
+/** Teks pesan dengan #hashtag yang bisa diketuk (membuka Timeline untuk hashtag itu). */
+function RichText({ text, mine }: { text: string; mine: boolean }) {
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  for (const m of text.matchAll(HASHTAG_RE)) {
+    const i = m.index ?? 0;
+    if (i > last) parts.push(text.slice(last, i));
+    parts.push(
+      <Link
+        key={i}
+        href={`/timeline?tag=${encodeURIComponent(m[1].toLowerCase())}`}
+        onPointerDown={(e) => e.stopPropagation()}
+        className={`font-bold underline-offset-2 hover:underline ${mine ? "text-sand" : "text-pink"}`}
+      >
+        {m[0]}
+      </Link>,
+    );
+    last = i + m[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return <>{parts}</>;
+}
+
+/** Gelembung lokasi: peta kecil + nama tempat + tombol buka di Maps. */
+function LocationBubble({ m, mine }: { m: ChatMessage; mine: boolean }) {
+  const p = m.meta;
+  if (!p) return null;
+  return (
+    <a
+      href={mapsUrl(p)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`flex w-60 max-w-[72vw] flex-col overflow-hidden rounded-[22px] bg-white shadow-soft ${mine ? "rounded-br-[6px]" : "rounded-bl-[6px]"}`}
+    >
+      {typeof p.lat === "number" && typeof p.lng === "number" && <MapPreview lat={p.lat} lng={p.lng} height={120} />}
+      <span className="flex flex-col gap-0.5 px-3.5 py-2.5 text-navy">
+        <span className="text-[11px] font-bold tracking-wide text-pink uppercase">📍 Lagi di sini</span>
+        <span className="line-clamp-2 font-bold leading-snug">{p.name}</span>
+        {p.address && <span className="line-clamp-1 text-xs text-muted">{p.address}</span>}
+        <span className="mt-1 text-xs font-bold text-ocean">Buka di Maps ↗</span>
+      </span>
+    </a>
   );
 }
 
@@ -205,7 +253,9 @@ function MessageRow({
           ) : m.kind === "text" ? (
             <div className={`flex max-w-[78vw] flex-col gap-1.5 px-4 py-2.5 shadow-[0_3px_10px_rgba(11,37,69,0.05)] sm:max-w-[420px] lg:max-w-[520px] ${bubble} ${quote ? "pt-2" : ""}`}>
               {quote && <Quote reply={quote.reply} who={quoteWho} mine={mine} inBubble onJump={jump} />}
-              <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap select-none [@media(hover:hover)]:select-text">{m.body}</p>
+              <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap select-none [@media(hover:hover)]:select-text">
+                <RichText text={m.body ?? ""} mine={mine} />
+              </p>
             </div>
           ) : (
             <div className={`flex flex-col gap-1 ${mine ? "items-end" : "items-start"}`}>
@@ -215,6 +265,7 @@ function MessageRow({
                 </div>
               )}
               {m.kind === "heart" && <Heart size={64} />}
+              {m.kind === "location" && <LocationBubble m={m} mine={mine} />}
               {m.kind === "sticker" && (
                 <span role="img" aria-label="Stiker kucing kangen">
                   <Cat variant={mine ? "mochi" : "boba"} size={100} mood="love" motion="hop" />
@@ -350,6 +401,7 @@ export function ChatView({
   const [, startTransition] = useTransition();
   const listRef = useRef<HTMLDivElement>(null);
   const [camOpen, setCamOpen] = useState(false);
+  const [locOpen, setLocOpen] = useState(false);
   const [rec, setRec] = useState({ recording: false, locked: false, ms: 0, cancelHint: 0 });
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSent = useRef(0);
@@ -506,7 +558,7 @@ export function ChatView({
     mediaPath: string | null = null,
     localUrl?: string,
     thumbPath: string | null = null,
-    extra: { durationMs?: number } = {},
+    extra: { durationMs?: number; place?: Place } = {},
   ) {
     setError(undefined);
     stickToBottom.current = true;
@@ -530,9 +582,10 @@ export function ChatView({
       url: localUrl,
       fullUrl: localUrl,
       duration_ms: extra.durationMs ?? null,
+      meta: extra.place ? { name: extra.place.name, address: extra.place.address, lat: extra.place.lat ?? undefined, lng: extra.place.lng ?? undefined } : null,
     });
     startTransition(async () => {
-      const res = await attempt(() => sendMessage({ kind, body, mediaPath, thumbPath, replyTo: replying?.id ?? null, durationMs: extra.durationMs ?? null }));
+      const res = await attempt(() => sendMessage({ kind, body, mediaPath, thumbPath, replyTo: replying?.id ?? null, durationMs: extra.durationMs ?? null, place: extra.place ?? null }));
       if ("error" in res && res.error || !("message" in res) || !res.message) {
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
         setError(("error" in res && res.error) || "Pesan gagal terkirim.");
@@ -686,6 +739,9 @@ export function ChatView({
           </div>
         )}
         <div className="scroll-row flex gap-2">
+          <button type="button" onClick={() => setLocOpen(true)} className="chip min-h-9 shrink-0 bg-pink-soft text-[13px] shadow-none">
+            📍 Lokasi
+          </button>
           {QUICK.map((q) => (
             <button key={q} type="button" onClick={() => send("text", q)} className="chip min-h-9 bg-sky text-[13px] shadow-none">
               {q}
@@ -744,6 +800,13 @@ export function ChatView({
       </form>
       {viewing && <PhotoViewer message={viewing} onClose={() => setViewing(null)} />}
       <CameraCapture open={camOpen} onClose={() => setCamOpen(false)} onPick={onPhoto} confirmLabel="Kirim pap" />
+      <LocationPicker
+        open={locOpen}
+        onClose={() => setLocOpen(false)}
+        requireCoords
+        title="Kirim lokasi 📍"
+        onPick={(place) => send("location", place.name, null, undefined, null, { place })}
+      />
     </div>
   );
 }

@@ -28,6 +28,7 @@ function preview(kind: string, body: unknown) {
   if (kind === "heart") return "Mengirim hati ❤";
   if (kind === "sticker") return "Mengirim stiker kucing";
   if (kind === "voice") return "🎤 Voice note";
+  if (kind === "location") return `📍 Lagi di ${String(body ?? "sini")}`;
   const t = String(body ?? "");
   return t.length > 90 ? `${t.slice(0, 87)}…` : t;
 }
@@ -235,9 +236,17 @@ export function LiveBridge({
                 toastFromPartner(`${pname()} pasang status baru`, `${payload.emoji ? `${String(payload.emoji)} ` : ""}${String(payload.text ?? "")}`, "/", "pink");
               }
               break;
-            case "story":
-              toastFromPartner(`${pname()} bikin story baru 👀`, "Ketuk untuk lihat di Beranda", "/", "pink");
+            case "story": {
+              const tagged = Array.isArray(payload.mentions) && payload.mentions.includes(me.id);
+              const place = payload.place ? ` · 📍 ${String(payload.place)}` : "";
+              toastFromPartner(
+                tagged ? `${pname()} menandai kamu di story 🏷️` : `${pname()} bikin story baru 👀`,
+                `Ketuk untuk lihat di Beranda${place}`,
+                "/",
+                "pink",
+              );
               break;
+            }
             case "issue_resolved":
               toastFromPartner("Kalian sudah sepakat ✨", String(payload.agreement ?? payload.title ?? ""), "/ruang-bicara", "aqua");
               break;

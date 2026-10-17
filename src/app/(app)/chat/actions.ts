@@ -7,13 +7,14 @@ import { requireCouple } from "@/lib/dal";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Message } from "@/lib/types";
 import { MESSAGE_COLS } from "@/lib/chat";
+import { cleanPlace, type Place } from "@/lib/geo";
 import { withMediaUrls } from "@/lib/chat-server";
 
 export type ReplyRef = Pick<Message, "id" | "sender_id" | "kind" | "body">;
 export type StoryRef = { id: string; author_id: string; thumb_path: string | null };
 export type ChatMessage = Message & { url?: string; fullUrl?: string; reply?: ReplyRef | null; story?: StoryRef | null; storyUrl?: string };
 
-const KINDS = ["text", "heart", "photo", "sticker", "voice"] as const;
+const KINDS = ["text", "heart", "photo", "sticker", "voice", "location"] as const;
 const UUID = /^[0-9a-f-]{36}$/i;
 
 export async function sendMessage(input: {
@@ -24,10 +25,13 @@ export async function sendMessage(input: {
   replyTo?: string | null;
   durationMs?: number | null;
   storyId?: string | null;
+  place?: Place | null;
 }) {
   const viewer = await requireCouple();
   if (!KINDS.includes(input.kind)) return { error: "Jenis pesan tidak dikenal." };
-  const body = input.body?.trim().slice(0, 2000) || null;
+  const place = input.kind === "location" ? cleanPlace(input.place, true) : null;
+  if (input.kind === "location" && !place) return { error: "Lokasi belum dipilih." };
+  const body = place ? place.name : input.body?.trim().slice(0, 2000) || null;
   if (input.kind === "text" && !body) return { error: "Pesan kosong." };
   const prefix = `${viewer.couple.id}/`;
   const replyTo = input.replyTo && UUID.test(input.replyTo) ? input.replyTo : null;
@@ -51,6 +55,7 @@ export async function sendMessage(input: {
       reply_to: replyTo,
       duration_ms: durationMs,
       story_id: storyId,
+      meta: place,
     })
     .select(MESSAGE_COLS)
     .single();

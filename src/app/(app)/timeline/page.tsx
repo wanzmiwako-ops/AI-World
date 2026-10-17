@@ -10,16 +10,20 @@ import { signedUrls } from "@/lib/storage";
 import { loadStoryFeed } from "@/lib/stories-server";
 import { dayKey, daysBetween } from "@/lib/dates";
 import { TimelineList, type TimelineEvent } from "./timeline-list";
+import Link from "next/link";
+import { cleanTag, hashtagsIn, mapsUrl, type Place } from "@/lib/geo";
+import type { Story } from "@/lib/stories";
 
 export const metadata: Metadata = { title: "Timeline" };
 
 const MOOD_EMOJI: Record<string, string> = { Seneng: "😊", Seru: "🤩", Santai: "😌", Baper: "🥺" };
 
-async function TimelineContent() {
+async function TimelineContent({ searchParams }: { searchParams: Promise<{ tag?: string }> }) {
+  const tag = cleanTag((await searchParams).tag ?? "");
   const supabase = await createClient();
   const now = new Date();
   const nowIso = now.toISOString();
-  const [viewer, meetings, checkins, photos, issues, firstMsg, feed, otd] = await Promise.all([
+  const [viewer, meetings, checkins, photos, issues, firstMsg, feed, otd, tagged, places] = await Promise.all([
     requireCouple(),
     supabase.from("meetings").select("id, title, place, starts_at").lt("starts_at", nowIso).order("starts_at", { ascending: false }).limit(200),
     supabase.from("checkin_sessions").select("id, place, together_at, mood, note").not("together_at", "is", null).order("together_at", { ascending: false }).limit(200),
@@ -28,6 +32,10 @@ async function TimelineContent() {
     supabase.from("messages").select("created_at, kind, body").order("created_at", { ascending: true }).limit(1).maybeSingle(),
     loadStoryFeed(supabase),
     supabase.rpc("on_this_day"),
+    // pesan chat yang memakai #hashtag (untuk daftar hashtag & filter)
+    supabase.from("messages").select("id, body, created_at, sender_id").eq("kind", "text").like("body", "%#%").order("created_at", { ascending: false }).limit(500),
+    // lokasi yang pernah dikirim di chat
+    supabase.from("messages").select("id, meta, created_at, sender_id").eq("kind", "location").order("created_at", { ascending: false }).limit(200),
   ]);
 
   const partnerName = viewer.partner?.display_name ?? "pasanganmu";
@@ -87,9 +95,22 @@ async function TimelineContent() {
       kind: "momen",
       emoji: h.emoji ?? "⭐",
       title: `Sorotan: ${h.title}`,
-      sub: `${h.stories.length} story tersimpan`,
+      sub: [`${h.stories.length} story tersimpan`, h.stories.find((s) => s.location)?.location?.name].filter(Boolean).join(" · 📍 "),
       thumbs: h.stories.slice(-3).map((s) => s.thumbUrl).filter((u): u is string => Boolean(u)),
       tall: true,
+    });
+  }
+  for (const m of places.data ?? []) {
+    const p = m.meta as Place | null;
+    if (!p?.name) continue;
+    events.push({
+      key: `loc-${m.id}`,
+      at: m.created_at,
+      kind: "ketemu",
+      emoji: "📍",
+      title: `${m.sender_id === viewer.userId ? "Kamu" : partnerName} lagi di ${p.name}`,
+      sub: p.address ?? undefined,
+      href: mapsUrl(p),
     });
   }
   if (firstMsg.data) {
@@ -111,7 +132,44 @@ async function TimelineContent() {
     }
   }
 
+  // Hashtag: dari story (aktif & sorotan), chat, dan keterangan foto
+  const allStories: Story[] = [...feed.stories, ...feed.highlights.flatMap((h) => h.stories)];
+  const counts = new Map<string, number>();
+  const bump = (t: string) => counts.set(t, (counts.get(t) ?? 0) + 1);
+  for (const st of allStories) st.hashtags?.forEach(bump);
+  for (const m of tagged.data ?? []) new Set(hashtagsIn(m.body)).forEach(bump);
+  for (const p of photoRows) new Set(hashtagsIn(p.caption)).forEach(bump);
+  const topTags = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
+
+  let shown = events;
+  if (tag) {
+    const seen = new Set<string>();
+    shown = [];
+    for (const st of allStories) {
+      if (!st.hashtags?.includes(tag) || seen.has(st.id)) continue;
+      seen.add(st.id);
+      shown.push({
+        key: `st-${st.id}`,
+        at: st.created_at,
+        kind: "momen",
+        emoji: "📸",
+        title: `Story ${st.author_id === viewer.userId ? "kamu" : partnerName}`,
+        sub: [st.location ? `📍 ${st.location.name}` : null, st.hashtags.map((t) => `#${t}`).join(" ")].filter(Boolean).join(" · "),
+        thumbs: st.thumbUrl ? [st.thumbUrl] : [],
+        tall: true,
+      });
+    }
+    for (const m of tagged.data ?? []) {
+      if (!hashtagsIn(m.body).includes(tag)) continue;
+      shown.push({ key: `msg-${m.id}`, at: m.created_at, kind: "momen", emoji: "💬", title: m.sender_id === viewer.userId ? "Kamu di chat" : `${partnerName} di chat`, sub: m.body ?? undefined, href: "/chat" });
+    }
+    for (const e of events) {
+      if (e.kind === "foto" && byDay.get(e.key.slice(6))?.some((p) => hashtagsIn(p.caption).includes(tag))) shown.push(e);
+    }
+  }
+
   events.sort((a, b) => b.at.localeCompare(a.at));
+  shown.sort((a, b) => b.at.localeCompare(a.at));
   const meetCount = (checkins.data ?? []).length || (meetings.data ?? []).length;
 
   return (
@@ -160,18 +218,43 @@ async function TimelineContent() {
         </section>
       )}
 
-      <TimelineList events={events} />
+      {(topTags.length > 0 || tag) && (
+        <section className="flex animate-rise flex-col gap-2">
+          <h2 className="font-display text-lg font-medium">{tag ? `#${tag}` : "Hashtag kalian"}</h2>
+          {tag && (
+            <p className="-mt-1 text-sm text-muted">
+              {shown.length} cerita ·{" "}
+              <Link href="/timeline" className="font-bold text-ocean">
+                lihat semua ✕
+              </Link>
+            </p>
+          )}
+          <div className="scroll-row flex gap-2">
+            {topTags.map(([t, n]) => (
+              <Link
+                key={t}
+                href={t === tag ? "/timeline" : `/timeline?tag=${encodeURIComponent(t)}`}
+                className={`chip shrink-0 ${t === tag ? "bg-pink text-white" : ""}`}
+              >
+                #{t} <span className="opacity-60">{n}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <TimelineList key={tag || "semua"} events={shown} plain={Boolean(tag)} />
     </div>
   );
 }
 
-export default function TimelinePage() {
+export default function TimelinePage({ searchParams }: { searchParams: Promise<{ tag?: string }> }) {
   return (
     <Page>
       <PageHeader title="Timeline" subtitle="Perjalanan cerita kalian" back="/" />
-      <LiveRefresh kinds={["meeting", "meeting_deleted", "photo", "issue_resolved", "highlight", "story_deleted"]} />
+      <LiveRefresh kinds={["meeting", "meeting_deleted", "photo", "issue_resolved", "highlight", "story", "story_deleted"]} />
       <Suspense fallback={<PageSkeleton />}>
-        <TimelineContent />
+        <TimelineContent searchParams={searchParams} />
       </Suspense>
     </Page>
   );
